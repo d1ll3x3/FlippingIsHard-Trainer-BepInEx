@@ -15,26 +15,27 @@ A BepInEx 6 IL2CPP plugin for "Flipping is Hard Demo" that adds position saving/
 
 ## Requirements
 
-- [BepInEx 6.0.0-be.755](https://github.com/BepInEx/BepInEx/releases) (IL2CPP build)
-- .NET 6.0 SDK (to build from source)
+- [BepInEx 6.0.0-be.755](https://github.com/BepInEx/BepInEx/releases) (IL2CPP build) installed in the game folder
+- .NET 6.0 SDK — [download](https://dotnet.microsoft.com/download/dotnet/6.0)
 - Game: "Flipping is Hard Demo" (Steam)
 
-## Installation
+## Installation (pre-built)
 
-1. Install BepInEx 6 into the game folder
-2. Copy `FlippingIsHardTrainer.dll` to:
+1. Download `FlippingIsHardTrainer.dll` from [Releases](../../releases)
+2. Copy it to:
    ```
-   [Game Folder]\BepInEx\plugins\FlippingIsHardTrainer\
+   [Game Folder]\BepInEx\plugins\FlippingIsHardTrainer\FlippingIsHardTrainer.dll
    ```
+   Create the `FlippingIsHardTrainer` folder if it doesn't exist.
 3. Launch the game — the plugin loads automatically
 
 ## Controls
 
 | Key | Action |
 |-----|--------|
-| `Shift+R` | Save position |
+| `Shift+R` | Save current position |
 | `R` | Teleport to saved position |
-| `F` | Toggle fly mode |
+| `F` | Toggle fly mode ON/OFF |
 | `WASD` | Move in fly mode (camera-relative) |
 | `Space` | Move up |
 | `Ctrl` | Move down |
@@ -42,10 +43,58 @@ A BepInEx 6 IL2CPP plugin for "Flipping is Hard Demo" that adds position saving/
 
 ## Building from Source
 
-1. Run `setup-libs.bat` to copy the required DLLs from your game installation
-2. Run `build.bat` to compile and deploy automatically
+### Prerequisites
 
-> The `lib/` folder is not included in the repo. You must run `setup-libs.bat` first.
+- [.NET 6.0 SDK](https://dotnet.microsoft.com/download/dotnet/6.0)
+- BepInEx 6 installed in the game folder
+- The game launched at least once with BepInEx (generates the `interop/` folder)
+
+### Steps
+
+**1. Clone the repo**
+```bash
+git clone https://github.com/d1ll3x3/FlippingIsHard-Trainer-BepInEx.git
+cd FlippingIsHard-Trainer-BepInEx
+```
+
+**2. Set up dependencies**
+
+Run the setup script — it auto-detects your Steam library and copies the required DLLs from the game into `lib/`:
+```bat
+setup-libs.bat
+```
+
+> If your Steam library is in a non-standard location, open `setup-libs.bat` and set `GAME_PATH` manually at the top.
+
+**3. Build and deploy**
+```bat
+build.bat
+```
+
+This compiles the plugin and copies the DLL directly to your game's plugin folder.
+
+Alternatively, build manually:
+```bash
+dotnet build -c Debug
+```
+Output: `bin\Debug\net6.0\FlippingIsHardTrainer.dll`
+
+Then copy it to `[Game Folder]\BepInEx\plugins\FlippingIsHardTrainer\`.
+
+### Troubleshooting
+
+**`setup-libs.bat` can't find the game**
+- Make sure BepInEx is installed and you've launched the game at least once
+- The `BepInEx\interop\` folder must exist (generated on first launch)
+- Edit `setup-libs.bat` and set `GAME_PATH` to your game folder manually
+
+**Build errors about missing types**
+- Run `setup-libs.bat` again
+- Verify `lib\UnityEngine.CoreModule.dll` exists and is larger than 1 MB
+
+**Plugin doesn't load**
+- Check `BepInEx\LogOutput.log` in the game folder
+- Verify the DLL is in `BepInEx\plugins\FlippingIsHardTrainer\`
 
 ## License
 
