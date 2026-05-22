@@ -17,7 +17,7 @@ A BepInEx 6 IL2CPP plugin for "Flipping is Hard Demo" that adds position saving/
 
 - [BepInEx 6.0.0-be.755](https://github.com/BepInEx/BepInEx/releases) (IL2CPP build) installed in the game folder
 - .NET 6.0 SDK — [download](https://dotnet.microsoft.com/download/dotnet/6.0)
-- Game: "Flipping is Hard Demo" (Steam)
+- Game: "Flipping is Hard Demo" (only tested in V0.11.008 & V0.9.15)
 
 ## Installation (pre-built)
 
@@ -81,20 +81,7 @@ Output: `bin\Debug\net6.0\FlippingIsHardTrainer.dll`
 
 Then copy it to `[Game Folder]\BepInEx\plugins\FlippingIsHardTrainer\`.
 
-### Troubleshooting
 
-**`setup-libs.bat` can't find the game**
-- Make sure BepInEx is installed and you've launched the game at least once
-- The `BepInEx\interop\` folder must exist (generated on first launch)
-- Edit `setup-libs.bat` and set `GAME_PATH` to your game folder manually
-
-**Build errors about missing types**
-- Run `setup-libs.bat` again
-- Verify `lib\UnityEngine.CoreModule.dll` exists and is larger than 1 MB
-
-**Plugin doesn't load**
-- Check `BepInEx\LogOutput.log` in the game folder
-- Verify the DLL is in `BepInEx\plugins\FlippingIsHardTrainer\`
 
 ## License
 
