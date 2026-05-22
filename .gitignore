@@ -1,0 +1,26 @@
+# Build output
+bin/
+obj/
+
+# Local DLL references (run setup-libs.bat to generate)
+lib/
+
+# Compiled binaries
+*.dll
+*.exe
+*.pdb
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+*.sln.iml
+
+# NuGet
+*.nupkg
+.nuget/
+
+# BepInEx runtime folders
+plugins/
+config/
