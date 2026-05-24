@@ -11,12 +11,37 @@
 # Visual Studio Code
 .vscode/
 
-# Build results
+# Binaries
 bin/
 obj/
 *.dll
 *.exe
 *.pdb
+
+# Visual Studio / IDE files
+*.user
+*.suo
+*.userosprefs
+*.sln
+*.csproj.user
+
+# Logs and temp files
+*.log
+*.tmp
+*.temp
+.trae/
+
+# Unity / Game specific (if copied by accident)
+lib/
+*.asset
+*.unity3d
+
+# Scripts antiguos o de inyección C++ que ya no se usan
+build.bat
+setup-libs.bat
+setup-libs.ps1
+injector.cpp
+trainer.cpp
 
 # NuGet
 *.nupkg
@@ -25,8 +50,6 @@ obj/
 
 # User-specific files
 *.rsuser
-*.suo
-*.user
 *.userosscache
 *.sln.docstates
 
