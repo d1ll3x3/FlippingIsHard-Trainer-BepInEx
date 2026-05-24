@@ -1,0 +1,10 @@
+{
+  "name": "Flipping is Hard Trainer",
+  "author": "Converted from C++ trainer",
+  "description": "BepInEx plugin for Flipping is Hard Demo with position save/restore and fly mode",
+  "version_number": "1.0.0",
+  "dependencies": [
+    "BepInEx-BepInExPack-6.0.0-be.755"
+  ],
+  "website_url": ""
+}
