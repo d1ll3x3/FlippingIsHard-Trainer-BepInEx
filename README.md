@@ -14,6 +14,10 @@ A highly optimized Unity IL2CPP BepInEx plugin for "Flipping is Hard Demo" that 
   - Camera-relative movement with WASD (follows where you look)
   - Vertical movement with Space/Ctrl
   - Speed boost with Shift (3x faster)
+- **⚙️ In-Game Customizable Keybinds** - Press `B` to open the fully featured Bind Menu!
+  - Remap any trainer action directly inside the game.
+  - Automatically isolates inputs so you don't accidentally move while editing.
+  - Auto-creates and saves to `com.flippingishard.trainer.json` in BepInEx config.
 - **📍 Real-time Telemetry** - HUD in the top-right corner showing current `SPEED`, `HEIGHT`, and `XYZ` position
 - **🎮 Smart Overlay** - Real-time UI showing controls, active toggles, and saved position state
 - **⚡ Ultra Optimized** - Rewritten from scratch to eliminate lag spikes and stuttering during gameplay.
@@ -30,6 +34,7 @@ A highly optimized Unity IL2CPP BepInEx plugin for "Flipping is Hard Demo" that 
 3. Start the game.
 
 ### 3. **Use In-Game**
+- **`B`** → Open the **Keybinds Menu** to customize all controls in real-time.
 - **`Shift + R`** → Save current position, rotation, and physical velocity
 - **`R`** → Teleport to saved position
 - **`V`** → Toggle restoring physical velocity upon teleport
@@ -48,6 +53,8 @@ Trainer/
 ├── FlippingIsHardTrainer.csproj # .NET 6 Project configuration
 ├── TrainerPlugin.cs             # Main BepInEx entry point
 ├── TrainerController.cs         # Core logic and optimization
+├── TrainerConfig.cs             # Configuration and JSON save/load system
+├── BindMenuRenderer.cs          # In-game interactive UI for custom keybinds
 ├── GameObjectFinder.cs          # Smart and lag-free player finder
 ├── InputHandler.cs              # Keyboard hook
 ├── OverlayRenderer.cs           # HUD Renderer

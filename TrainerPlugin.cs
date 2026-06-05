@@ -1,6 +1,7 @@
 using BepInEx;
 using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
+using HarmonyLib;
 using Il2CppInterop.Runtime.Injection;
 using UnityEngine;
 using System;
@@ -20,6 +21,9 @@ namespace FlippingIsHardTrainer
 
             try
             {
+                var harmony = new Harmony("com.flippingishard.trainer");
+                harmony.PatchAll();
+
                 // Register our custom MonoBehaviour with IL2CPP before using AddComponent
                 ClassInjector.RegisterTypeInIl2Cpp<TrainerBehaviour>();
 

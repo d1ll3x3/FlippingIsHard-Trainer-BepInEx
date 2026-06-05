@@ -21,8 +21,8 @@ namespace FlippingIsHardTrainer
 
         // Layout constants
         private const int CTRL_W = 390;
-        private const int CTRL_H = 212;
-        private const int CTRL_H_FLY = 260;
+        private const int CTRL_H = 236;
+        private const int CTRL_H_FLY = 284;
         private const int COORD_W = 240;
         private const int COORD_H = 92;
         private const int PAD = 20;
@@ -129,30 +129,42 @@ namespace FlippingIsHardTrainer
                 cy += 24;
             }
 
+            string saveStr = TrainerConfig.Settings.SavePosition.ToString().PadRight(10);
+            string telStr = TrainerConfig.Settings.Teleport.ToString().PadRight(10);
+            string flyStr = TrainerConfig.Settings.ToggleFlyMode.ToString().PadRight(10);
+            string velStr = TrainerConfig.Settings.ToggleKeepVelocity.ToString().PadRight(10);
+            string angStr = TrainerConfig.Settings.ToggleKeepAngle.ToString().PadRight(10);
+            string menuStr = TrainerConfig.Settings.OpenBindMenu.ToString().PadRight(10);
+
             // Shift+R
             _styleText.normal.textColor = Color.white;
-            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), "  Shift+R   :  Save position", _styleText);
+            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), $"  {saveStr}:  Save position", _styleText);
             cy += 24;
 
             // R
             _styleText.normal.textColor = _hasSavedPosition ? _savedColor : _dimColor;
-            string teleportLabel = _hasSavedPosition ? "  R         :  Teleport (Ready)" : "  R         :  Teleport (Save first)";
+            string teleportLabel = _hasSavedPosition ? $"  {telStr}:  Teleport (Ready)" : $"  {telStr}:  Teleport (Save first)";
             GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), teleportLabel, _styleText);
             cy += 24;
 
             // F
             _styleText.normal.textColor = _ctrlColor;
-            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), "  F         :  Toggle Fly Mode", _styleText);
+            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), $"  {flyStr}:  Toggle Fly Mode", _styleText);
             cy += 24;
 
             // V
             _styleText.normal.textColor = _keepVelocityActive ? _savedColor : _dimColor;
-            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), $"  V         :  Keep Velocity [{(_keepVelocityActive ? "ON" : "OFF")}]", _styleText);
+            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), $"  {velStr}:  Keep Velocity [{(_keepVelocityActive ? "ON" : "OFF")}]", _styleText);
             cy += 24;
 
             // C
             _styleText.normal.textColor = _keepAngleActive ? _savedColor : _dimColor;
-            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), $"  C         :  Keep Angle [{(_keepAngleActive ? "ON" : "OFF")}]", _styleText);
+            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), $"  {angStr}:  Keep Angle [{(_keepAngleActive ? "ON" : "OFF")}]", _styleText);
+            cy += 24;
+            
+            // Menu
+            _styleText.normal.textColor = _dimColor;
+            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), $"  {menuStr}:  Open Bind Menu", _styleText);
         }
 
         // ── Coordinates overlay (top-right) ─────────────────────────────────

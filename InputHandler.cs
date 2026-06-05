@@ -4,77 +4,61 @@ namespace FlippingIsHardTrainer
 {
     public class InputHandler
     {
-        // Key state tracking
-        private bool _rKeyDown = false;
-        private bool _shiftKeyDown = false;
-        private bool _fKeyDown = false;
-        private bool _vKeyDown = false;
-        private bool _cKeyDown = false;
-        
-        // Key press detection (to avoid holding)
-        private bool _rKeyPressed = false;
-        private bool _shiftRCombinationPressed = false;
-        private bool _fKeyPressed = false;
-        private bool _vKeyPressed = false;
-        private bool _cKeyPressed = false;
-        
+        // Replaced static keys with dictionary of pressed states
+        private System.Collections.Generic.Dictionary<string, bool> _wasPressed = new System.Collections.Generic.Dictionary<string, bool>();
+
         public void Update()
         {
-            // Update key states
-            bool currentRKey = UnityEngine.Input.GetKey(UnityEngine.KeyCode.R);
-            bool currentShiftKey = UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift);
-            bool currentFKey = UnityEngine.Input.GetKey(UnityEngine.KeyCode.F);
-            bool currentVKey = UnityEngine.Input.GetKey(UnityEngine.KeyCode.V);
-            bool currentCKey = UnityEngine.Input.GetKey(UnityEngine.KeyCode.C);
+            // Only update logic is needed here for other things, but our actions will be checked dynamically.
+        }
+
+        private bool IsModifierHeld(KeyCode modifier)
+        {
+            if (modifier == KeyCode.None) return false;
+            if (modifier == KeyCode.LeftShift || modifier == KeyCode.RightShift)
+                return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            if (modifier == KeyCode.LeftControl || modifier == KeyCode.RightControl)
+                return Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+            if (modifier == KeyCode.LeftAlt || modifier == KeyCode.RightAlt)
+                return Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
             
-            // Detect key presses (transition from not pressed to pressed)
-            _rKeyPressed = currentRKey && !_rKeyDown;
-            _fKeyPressed = currentFKey && !_fKeyDown;
-            _vKeyPressed = currentVKey && !_vKeyDown;
-            _cKeyPressed = currentCKey && !_cKeyDown;
+            return Input.GetKey(modifier);
+        }
+
+        private bool IsAnyModifierHeld()
+        {
+            return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) ||
+                   Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl) ||
+                   Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
+        }
+
+        private bool CheckBindPressed(string bindId, KeyBind bind)
+        {
+            if (bind == null || bind.MainKey == KeyCode.None) return false;
+
+            bool isMainHeld = Input.GetKey(bind.MainKey);
+            bool isModHeld = IsModifierHeld(bind.Modifier);
             
-            // Detect Shift+R combination
-            if (currentShiftKey && _rKeyPressed)
-            {
-                _shiftRCombinationPressed = true;
-            }
-            else
-            {
-                _shiftRCombinationPressed = false;
-            }
-            
-            // Update key down states
-            _rKeyDown = currentRKey;
-            _shiftKeyDown = currentShiftKey;
-            _fKeyDown = currentFKey;
-            _vKeyDown = currentVKey;
-            _cKeyDown = currentCKey;
+            // Si el bind exige modificador, tiene que estar pulsado. 
+            // Si no exige modificador, NO debe haber ningún modificador pulsado para evitar conflictos.
+            bool modValid = (bind.Modifier == KeyCode.None) ? !IsAnyModifierHeld() : isModHeld;
+
+            bool isCurrentlyPressed = isMainHeld && modValid;
+
+            if (!_wasPressed.ContainsKey(bindId)) _wasPressed[bindId] = false;
+
+            bool justPressed = isCurrentlyPressed && !_wasPressed[bindId];
+            _wasPressed[bindId] = isCurrentlyPressed;
+
+            return justPressed;
         }
-        
-        public bool IsSavePositionPressed()
-        {
-            return _shiftRCombinationPressed;
-        }
-        
-        public bool IsTeleportPressed()
-        {
-            return _rKeyPressed && !_shiftKeyDown;
-        }
-        
-        public bool IsToggleFlyModePressed()
-        {
-            return _fKeyPressed;
-        }
-        
-        public bool IsToggleKeepVelocityPressed()
-        {
-            return _vKeyPressed;
-        }
-        
-        public bool IsToggleKeepAnglePressed()
-        {
-            return _cKeyPressed;
-        }
+
+        public bool IsSavePositionPressed() => CheckBindPressed("Save", TrainerConfig.Settings.SavePosition);
+        public bool IsTeleportPressed() => CheckBindPressed("Teleport", TrainerConfig.Settings.Teleport);
+        public bool IsToggleFlyModePressed() => CheckBindPressed("Fly", TrainerConfig.Settings.ToggleFlyMode);
+        public bool IsToggleKeepVelocityPressed() => CheckBindPressed("Vel", TrainerConfig.Settings.ToggleKeepVelocity);
+        public bool IsToggleKeepAnglePressed() => CheckBindPressed("Angle", TrainerConfig.Settings.ToggleKeepAngle);
+        public bool IsOpenBindMenuPressed() => CheckBindPressed("Bind", TrainerConfig.Settings.OpenBindMenu);
         
         // Fly mode movement keys
         public bool IsWPressed() => UnityEngine.Input.GetKey(UnityEngine.KeyCode.W);

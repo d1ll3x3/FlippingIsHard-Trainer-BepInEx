@@ -26,6 +26,7 @@ namespace FlippingIsHardTrainer
         private GameObjectFinder _gameObjectFinder;
         private InputHandler _inputHandler;
         private OverlayRenderer _overlayRenderer;
+        private BindMenuRenderer _bindMenuRenderer;
         
         // Current state for overlay
         private Vector3 _currentPosition = Vector3.zero;
@@ -37,9 +38,12 @@ namespace FlippingIsHardTrainer
             try
             {
                 // Initialize components
+                TrainerConfig.Load();
+                
                 _gameObjectFinder = new GameObjectFinder();
                 _inputHandler = new InputHandler();
                 _overlayRenderer = new OverlayRenderer();
+                _bindMenuRenderer = new BindMenuRenderer(_gameObjectFinder);
                 
                 TrainerPlugin.Logger.LogInfo("TrainerController initialized successfully");
             }
@@ -58,14 +62,23 @@ namespace FlippingIsHardTrainer
                 
                 // Update input handler
                 _inputHandler.Update();
-                
-                // Handle trainer hotkeys
-                HandleHotkeys();
-                
-                // Handle fly mode if active
-                if (_flyModeActive)
+
+                // Open bind menu
+                if (_inputHandler.IsOpenBindMenuPressed())
                 {
-                    HandleFlyMode();
+                    _bindMenuRenderer.ToggleVisibility();
+                }
+                
+                // Handle trainer hotkeys only if menu is not visible
+                if (!_bindMenuRenderer.IsVisible)
+                {
+                    HandleHotkeys();
+                    
+                    // Handle fly mode if active
+                    if (_flyModeActive)
+                    {
+                        HandleFlyMode();
+                    }
                 }
                 
                 // Reducimos la frecuencia de actualización de UI a 1 vez cada varios frames para evitar lag
@@ -87,6 +100,7 @@ namespace FlippingIsHardTrainer
             {
                 if (!enabled) return;
                 _overlayRenderer.OnGUI();
+                _bindMenuRenderer?.Draw();
             }
             catch (Exception ex)
             {
