@@ -22,6 +22,7 @@ namespace FlippingIsHardTrainer
         // Listening state
         private string _listeningAction = null;
         private bool _clickHandledThisFrame = false;
+        private GUI.WindowFunction _windowDelegate;
 
         public static bool IsVisibleGlobally = false;
         public bool IsVisible => _isVisible;
@@ -29,6 +30,7 @@ namespace FlippingIsHardTrainer
         public BindMenuRenderer(GameObjectFinder gameObjectFinder)
         {
             _gameObjectFinder = gameObjectFinder;
+            _windowDelegate = new Action<int>(WindowFunction);
         }
 
         public void ToggleVisibility()
@@ -147,8 +149,7 @@ namespace FlippingIsHardTrainer
             }
 
             GUI.backgroundColor = new Color(0.2f, 0.2f, 0.2f, 1f);
-            GUI.WindowFunction windowDelegate = new Action<int>(WindowFunction);
-            _windowRect = GUI.Window(8493, _windowRect, windowDelegate, "TRAINER KEYBINDS");
+            _windowRect = GUI.Window(8493, _windowRect, _windowDelegate, "TRAINER KEYBINDS");
             GUI.backgroundColor = _defaultBgColor;
         }
 

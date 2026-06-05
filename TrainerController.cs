@@ -357,24 +357,6 @@ namespace FlippingIsHardTrainer
             return velocity;
         }
         
-        private void ResetPlayerVelocity(GameObject player)
-        {
-            try
-            {
-                // Try to get Rigidbody component
-                var rigidbody = player.GetComponent<Rigidbody>();
-                if (rigidbody != null)
-                {
-                    rigidbody.linearVelocity = Vector3.zero;
-                    rigidbody.angularVelocity = Vector3.zero;
-                }
-            }
-            catch (Exception ex)
-            {
-                TrainerPlugin.Logger.LogWarning($"Error resetting velocity: {ex.Message}");
-            }
-        }
-        
         private void UpdateCurrentPosition()
         {
             try
