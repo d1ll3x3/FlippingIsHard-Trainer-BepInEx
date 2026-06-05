@@ -9,17 +9,15 @@ namespace FlippingIsHardTrainer
     {
         // Cached references
         private GameObject _cachedPlayer;
+        private Rigidbody _cachedPlayerRigidbody;
         private GameObject _cachedCamera;
-        private float _lastPlayerFindTime = 0f;
-        private float _lastCameraFindTime = 0f;
-        
-        // Aumentamos la duración de la caché para reducir drásticamente las búsquedas
-        private const float CACHE_DURATION = 15f; 
         
         // Tiempo de espera (cooldown) si la búsqueda falla, para no inundar el log ni causar lag
         private float _playerSearchCooldown = 0f;
         private float _cameraSearchCooldown = 0f;
         private const float SEARCH_COOLDOWN_DURATION = 2f;
+        
+        public Rigidbody GetCachedPlayerRigidbody() => _cachedPlayerRigidbody;
         
         public Transform FindPlayerTransform()
         {
@@ -36,14 +34,12 @@ namespace FlippingIsHardTrainer
         public GameObject FindPlayer()
         {
             // Return cached player if still valid
-            if (_cachedPlayer != null && Time.time - _lastPlayerFindTime < CACHE_DURATION)
+            if (_cachedPlayer != null)
                 return _cachedPlayer;
                 
             // Check cooldown si ha fallado recientemente
             if (Time.time < _playerSearchCooldown)
                 return null;
-            
-            // TrainerPlugin.Logger.LogInfo("Searching for player GameObject..."); // Comentado para evitar spam en log
             
             // Method 1: Try to find by tag
             try
@@ -51,8 +47,7 @@ namespace FlippingIsHardTrainer
                 _cachedPlayer = GameObject.FindWithTag("Player");
                 if (_cachedPlayer != null)
                 {
-                    _lastPlayerFindTime = Time.time;
-                    // TrainerPlugin.Logger.LogInfo($"Found player by tag: {_cachedPlayer.name}");
+                    _cachedPlayerRigidbody = _cachedPlayer.GetComponent<Rigidbody>();
                     return _cachedPlayer;
                 }
             }
@@ -63,21 +58,19 @@ namespace FlippingIsHardTrainer
             
             // Si llegamos aquí, no lo encontró, aplicamos cooldown de 2 segundos antes de volver a buscar
             _playerSearchCooldown = Time.time + SEARCH_COOLDOWN_DURATION;
-            _cachedPlayer = null;
+            _cachedPlayerRigidbody = null;
             return null;
         }
         
         public GameObject FindCamera()
         {
             // Return cached camera if still valid
-            if (_cachedCamera != null && Time.time - _lastCameraFindTime < CACHE_DURATION)
+            if (_cachedCamera != null)
                 return _cachedCamera;
                 
             // Check cooldown si ha fallado recientemente
             if (Time.time < _cameraSearchCooldown)
                 return null;
-            
-            // TrainerPlugin.Logger.LogInfo("Searching for camera GameObject..."); // Comentado para evitar spam en log
             
             // Method 1: Try to find by tag
             try
@@ -85,8 +78,6 @@ namespace FlippingIsHardTrainer
                 _cachedCamera = GameObject.FindWithTag("MainCamera");
                 if (_cachedCamera != null)
                 {
-                    _lastCameraFindTime = Time.time;
-                    // TrainerPlugin.Logger.LogInfo($"Found camera by tag: {_cachedCamera.name}");
                     return _cachedCamera;
                 }
             }
@@ -97,7 +88,6 @@ namespace FlippingIsHardTrainer
             
             // Si llegamos aquí, no lo encontró, aplicamos cooldown de 2 segundos antes de volver a buscar
             _cameraSearchCooldown = Time.time + SEARCH_COOLDOWN_DURATION;
-            _cachedCamera = null;
             return null;
         }
         
@@ -182,9 +172,8 @@ namespace FlippingIsHardTrainer
         public void ClearCache()
         {
             _cachedPlayer = null;
+            _cachedPlayerRigidbody = null;
             _cachedCamera = null;
-            _lastPlayerFindTime = 0f;
-            _lastCameraFindTime = 0f;
         }
     }
 }

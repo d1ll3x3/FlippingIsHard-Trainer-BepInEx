@@ -8,14 +8,23 @@ namespace FlippingIsHardTrainer
         private Vector3 _currentPosition = Vector3.zero;
         private bool _hasSavedPosition = false;
         private bool _flyModeActive = false;
+        private bool _keepVelocityActive = false;
+        private bool _keepAngleActive = false;
         private bool _showOverlay = true;
+
+        // Coordinate caching
+        private Vector3? _cachedCoords = null;
+        private string _cachedHeightStr = "HEIGHT: 0.0 M";
+        private string _cachedCoordsStr = "XYZ: 0.0, 0.0, 0.0";
+        private float _lastSpeed = -1f;
+        private string _cachedSpeedStr = "SPEED: 0.0 M/S";
 
         // Layout constants
         private const int CTRL_W = 390;
-        private const int CTRL_H = 164;
-        private const int CTRL_H_FLY = 212;
+        private const int CTRL_H = 212;
+        private const int CTRL_H_FLY = 260;
         private const int COORD_W = 240;
-        private const int COORD_H = 70;
+        private const int COORD_H = 92;
         private const int PAD = 20;
 
         // Colors
@@ -33,11 +42,26 @@ namespace FlippingIsHardTrainer
         private GUIStyle _styleText;
         private bool _stylesReady = false;
 
-        public void UpdateData(Vector3 pos, bool hasSaved, bool flyActive)
+        public void UpdateData(Vector3 pos, float speed, bool hasSaved, bool flyActive, bool keepVelocity, bool keepAngle)
         {
-            _currentPosition = pos;
+            if (_cachedCoords == null || Vector3.Distance(_currentPosition, pos) > 0.05f)
+            {
+                _currentPosition = pos;
+                _cachedHeightStr = $"HEIGHT: {_currentPosition.y:F1} M";
+                _cachedCoordsStr = $"XYZ: {_currentPosition.x:F1}, {_currentPosition.y:F1}, {_currentPosition.z:F1}";
+                _cachedCoords = pos;
+            }
+
+            if (Mathf.Abs(_lastSpeed - speed) > 0.1f)
+            {
+                _lastSpeed = speed;
+                _cachedSpeedStr = $"SPEED: {speed:F1} M/S";
+            }
+
             _hasSavedPosition = hasSaved;
             _flyModeActive = flyActive;
+            _keepVelocityActive = keepVelocity;
+            _keepAngleActive = keepAngle;
             _showOverlay = Application.isFocused;
         }
 
@@ -119,6 +143,16 @@ namespace FlippingIsHardTrainer
             // F
             _styleText.normal.textColor = _ctrlColor;
             GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), "  F         :  Toggle Fly Mode", _styleText);
+            cy += 24;
+
+            // V
+            _styleText.normal.textColor = _keepVelocityActive ? _savedColor : _dimColor;
+            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), $"  V         :  Keep Velocity [{(_keepVelocityActive ? "ON" : "OFF")}]", _styleText);
+            cy += 24;
+
+            // C
+            _styleText.normal.textColor = _keepAngleActive ? _savedColor : _dimColor;
+            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), $"  C         :  Keep Angle [{(_keepAngleActive ? "ON" : "OFF")}]", _styleText);
         }
 
         // ── Coordinates overlay (top-right) ─────────────────────────────────
@@ -134,11 +168,11 @@ namespace FlippingIsHardTrainer
             float cy = y + 10;
 
             _styleText.normal.textColor = Color.white;
-            GUI.Label(new Rect(cx, cy, COORD_W - 24, 22),
-                $"HEIGHT: {_currentPosition.y:F1} M", _styleText);
-            cy += 26;
-            GUI.Label(new Rect(cx, cy, COORD_W - 24, 22),
-                $"XYZ: {_currentPosition.x:F1}, {_currentPosition.y:F1}, {_currentPosition.z:F1}", _styleText);
+            GUI.Label(new Rect(cx, cy, COORD_W - 24, 22), _cachedSpeedStr, _styleText);
+            cy += 24;
+            GUI.Label(new Rect(cx, cy, COORD_W - 24, 22), _cachedHeightStr, _styleText);
+            cy += 24;
+            GUI.Label(new Rect(cx, cy, COORD_W - 24, 22), _cachedCoordsStr, _styleText);
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────

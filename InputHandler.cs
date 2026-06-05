@@ -8,11 +8,15 @@ namespace FlippingIsHardTrainer
         private bool _rKeyDown = false;
         private bool _shiftKeyDown = false;
         private bool _fKeyDown = false;
+        private bool _vKeyDown = false;
+        private bool _cKeyDown = false;
         
         // Key press detection (to avoid holding)
         private bool _rKeyPressed = false;
         private bool _shiftRCombinationPressed = false;
         private bool _fKeyPressed = false;
+        private bool _vKeyPressed = false;
+        private bool _cKeyPressed = false;
         
         public void Update()
         {
@@ -20,10 +24,14 @@ namespace FlippingIsHardTrainer
             bool currentRKey = UnityEngine.Input.GetKey(UnityEngine.KeyCode.R);
             bool currentShiftKey = UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftShift) || UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightShift);
             bool currentFKey = UnityEngine.Input.GetKey(UnityEngine.KeyCode.F);
+            bool currentVKey = UnityEngine.Input.GetKey(UnityEngine.KeyCode.V);
+            bool currentCKey = UnityEngine.Input.GetKey(UnityEngine.KeyCode.C);
             
             // Detect key presses (transition from not pressed to pressed)
             _rKeyPressed = currentRKey && !_rKeyDown;
             _fKeyPressed = currentFKey && !_fKeyDown;
+            _vKeyPressed = currentVKey && !_vKeyDown;
+            _cKeyPressed = currentCKey && !_cKeyDown;
             
             // Detect Shift+R combination
             if (currentShiftKey && _rKeyPressed)
@@ -39,6 +47,8 @@ namespace FlippingIsHardTrainer
             _rKeyDown = currentRKey;
             _shiftKeyDown = currentShiftKey;
             _fKeyDown = currentFKey;
+            _vKeyDown = currentVKey;
+            _cKeyDown = currentCKey;
         }
         
         public bool IsSavePositionPressed()
@@ -54,6 +64,16 @@ namespace FlippingIsHardTrainer
         public bool IsToggleFlyModePressed()
         {
             return _fKeyPressed;
+        }
+        
+        public bool IsToggleKeepVelocityPressed()
+        {
+            return _vKeyPressed;
+        }
+        
+        public bool IsToggleKeepAnglePressed()
+        {
+            return _cKeyPressed;
         }
         
         // Fly mode movement keys
