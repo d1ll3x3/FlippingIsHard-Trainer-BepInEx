@@ -19,31 +19,31 @@
 
   <ItemGroup>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>I:\SteamLibrary\steamapps\common\Flipping is Hard Demo\BepInEx\interop\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>lib\UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.PhysicsModule">
-      <HintPath>I:\SteamLibrary\steamapps\common\Flipping is Hard Demo\BepInEx\interop\UnityEngine.PhysicsModule.dll</HintPath>
+      <HintPath>lib\UnityEngine.PhysicsModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.IMGUIModule">
-      <HintPath>I:\SteamLibrary\steamapps\common\Flipping is Hard Demo\BepInEx\interop\UnityEngine.IMGUIModule.dll</HintPath>
+      <HintPath>lib\UnityEngine.IMGUIModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.TextRenderingModule">
-      <HintPath>I:\SteamLibrary\steamapps\common\Flipping is Hard Demo\BepInEx\interop\UnityEngine.TextRenderingModule.dll</HintPath>
+      <HintPath>lib\UnityEngine.TextRenderingModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.InputLegacyModule">
-      <HintPath>I:\SteamLibrary\steamapps\common\Flipping is Hard Demo\BepInEx\interop\UnityEngine.InputLegacyModule.dll</HintPath>
+      <HintPath>lib\UnityEngine.InputLegacyModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Il2Cppmscorlib">
-      <HintPath>I:\SteamLibrary\steamapps\common\Flipping is Hard Demo\BepInEx\interop\Il2Cppmscorlib.dll</HintPath>
+      <HintPath>lib\Il2Cppmscorlib.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Il2CppSystem">
-      <HintPath>I:\SteamLibrary\steamapps\common\Flipping is Hard Demo\BepInEx\interop\Il2CppSystem.dll</HintPath>
+      <HintPath>lib\Il2CppSystem.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
