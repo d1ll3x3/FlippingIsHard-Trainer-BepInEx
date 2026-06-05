@@ -26,6 +26,7 @@ namespace FlippingIsHardTrainer
 
         public static bool IsVisibleGlobally = false;
         public bool IsVisible => _isVisible;
+        public Action OnMenuClosed;
 
         public BindMenuRenderer(GameObjectFinder gameObjectFinder)
         {
@@ -262,6 +263,8 @@ namespace FlippingIsHardTrainer
             // Hide and lock the cursor when the menu is closed
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
+
+            OnMenuClosed?.Invoke();
         }
 
         private void DisableGameScripts()

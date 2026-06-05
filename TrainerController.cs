@@ -43,7 +43,11 @@ namespace FlippingIsHardTrainer
                 _gameObjectFinder = new GameObjectFinder();
                 _inputHandler = new InputHandler();
                 _overlayRenderer = new OverlayRenderer();
+                _overlayRenderer.RefreshKeybinds();
                 _bindMenuRenderer = new BindMenuRenderer(_gameObjectFinder);
+                _bindMenuRenderer.OnMenuClosed = () => {
+                    _overlayRenderer.RefreshKeybinds();
+                };
                 
                 TrainerPlugin.Logger.LogInfo("TrainerController initialized successfully");
             }
