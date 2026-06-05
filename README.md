@@ -5,15 +5,17 @@ A highly optimized Unity IL2CPP BepInEx plugin for "Flipping is Hard Demo" that 
 ![Trainer Overlay](https://img.shields.io/badge/Status-Working-brightgreen) ![Platform](https://img.shields.io/badge/Platform-Windows-blue) ![License](https://img.shields.io/badge/License-MIT-green)
 
 ## ✨ Features
-- **📌 Position Save/Restore** - Save any position with `Shift+R`, teleport back with `R`
-- **✈️ Smooth Fly Mode** - Toggle free-camera flight with `F` key
+- **📌 Advanced Position Save/Restore** - Save any position with `Shift+R`, teleport back with `R`
+  - Toggle `V`: Preserve physical momentum (speed) when teleporting, or drop completely still
+  - Toggle `C`: Apply preserved momentum in the original global direction, or relative to your current camera view
+- **✈️ Smooth Noclip Fly Mode** - Toggle free-camera ghost flight with `F` key
+  - Physics-integrated movement for buttery smooth traversal
+  - Noclip enabled: Fly directly through walls, floors, and obstacles
   - Camera-relative movement with WASD (follows where you look)
   - Vertical movement with Space/Ctrl
   - Speed boost with Shift (3x faster)
-  - No gravity - stay in the air indefinitely
-  - Smooth, jitter-free movement
-- **📍 Real-time Coordinates** - Functional HUD in the top-right corner showing current `HEIGHT` and `XYZ` position
-- **🎮 Smart Overlay** - Real-time HUD showing controls, fly mode status, and saved position
+- **📍 Real-time Telemetry** - HUD in the top-right corner showing current `SPEED`, `HEIGHT`, and `XYZ` position
+- **🎮 Smart Overlay** - Real-time UI showing controls, active toggles, and saved position state
 - **⚡ Ultra Optimized** - Rewritten from scratch to eliminate lag spikes and stuttering during gameplay.
 
 ## 🚀 Quick Start
@@ -28,9 +30,11 @@ A highly optimized Unity IL2CPP BepInEx plugin for "Flipping is Hard Demo" that 
 3. Start the game.
 
 ### 3. **Use In-Game**
-- **`Shift + R`** → Save current position & rotation
-- **`R`** → Teleport to saved position (resets physics)
-- **`F`** → Toggle Fly Mode ON/OFF
+- **`Shift + R`** → Save current position, rotation, and physical velocity
+- **`R`** → Teleport to saved position
+- **`V`** → Toggle restoring physical velocity upon teleport
+- **`C`** → Toggle restoring angle/trajectory globally vs camera-relative
+- **`F`** → Toggle Smooth Noclip Fly Mode ON/OFF
 - **Fly Mode Controls:**
   - `W` / `S` → Move forward/backward (relative to camera)
   - `A` / `D` → Move left/right (relative to camera)
