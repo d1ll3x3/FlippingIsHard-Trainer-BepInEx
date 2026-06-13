@@ -29,9 +29,10 @@ namespace FlippingIsHardTrainer
         private string _strAngOn;
         private string _strAngOff;
         private string _strMenu;
+        private string _strFlyControls = "     WASD / Space / Ctrl  +  Shift=Turbo";
 
         // Layout constants
-        private const int CTRL_W = 390;
+        private const int CTRL_W = 420;
         private const int CTRL_H = 236;
         private const int CTRL_H_FLY = 284;
         private const int COORD_W = 240;
@@ -79,14 +80,15 @@ namespace FlippingIsHardTrainer
         public void SetPositionSaved(bool saved) => _hasSavedPosition = saved;
         public void SetFlyModeActive(bool active) => _flyModeActive = active;
 
-        public void RefreshKeybinds()
+        public void RefreshKeybinds(InputDeviceType device = InputDeviceType.Keyboard)
         {
-            string saveStr = TrainerConfig.Settings.SavePosition.ToString().PadRight(10);
-            string telStr = TrainerConfig.Settings.Teleport.ToString().PadRight(10);
-            string flyStr = TrainerConfig.Settings.ToggleFlyMode.ToString().PadRight(10);
-            string velStr = TrainerConfig.Settings.ToggleKeepVelocity.ToString().PadRight(10);
-            string angStr = TrainerConfig.Settings.ToggleKeepAngle.ToString().PadRight(10);
-            string menuStr = TrainerConfig.Settings.OpenBindMenu.ToString().PadRight(10);
+            bool ps = InputDeviceTracker.IsDualShock;
+            string saveStr = TrainerConfig.Settings.SavePosition.ToString(device, ps).PadRight(10);
+            string telStr = TrainerConfig.Settings.Teleport.ToString(device, ps).PadRight(10);
+            string flyStr = TrainerConfig.Settings.ToggleFlyMode.ToString(device, ps).PadRight(10);
+            string velStr = TrainerConfig.Settings.ToggleKeepVelocity.ToString(device, ps).PadRight(10);
+            string angStr = TrainerConfig.Settings.ToggleKeepAngle.ToString(device, ps).PadRight(10);
+            string menuStr = TrainerConfig.Settings.OpenBindMenu.ToString(device, ps).PadRight(10);
 
             _strSave = $"  {saveStr}:  Save position";
             _strTelSave = $"  {telStr}:  Teleport (Save first)";
@@ -97,6 +99,14 @@ namespace FlippingIsHardTrainer
             _strAngOn = $"  {angStr}:  Keep Angle [ON]";
             _strAngOff = $"  {angStr}:  Keep Angle [OFF]";
             _strMenu = $"  {menuStr}:  Open Bind Menu";
+
+            // Fly-mode control hint, switched by active device.
+            if (device == InputDeviceType.Gamepad)
+                _strFlyControls = ps
+                    ? "     L-Stick / R2 / L2  +  Circle=Turbo"
+                    : "     L-Stick / RT / LT  +  B=Turbo";
+            else
+                _strFlyControls = "     WASD / Space / Ctrl  +  Shift=Turbo";
         }
 
         public void OnGUI()
@@ -156,7 +166,7 @@ namespace FlippingIsHardTrainer
                 GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), "  \u00bb FLY MODE ACTIVE", _styleText);
                 cy += 24;
                 _styleText.normal.textColor = _dimColor;
-                GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), "     WASD / Space / Ctrl  +  Shift=Turbo", _styleText);
+                GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), _strFlyControls, _styleText);
                 cy += 24;
             }
 

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 
 namespace FlippingIsHardTrainer
 {
@@ -23,6 +25,32 @@ namespace FlippingIsHardTrainer
         private string _listeningAction = null;
         private bool _clickHandledThisFrame = false;
         private GUI.WindowFunction _windowDelegate;
+
+        // Gamepad navigation state
+        private int _selectedIndex = 0;
+        private bool _wasNavUp = false;
+        private bool _wasNavDown = false;
+        private const int NAV_ITEM_COUNT = 9; // 6 bind rows + Reset + Cancel + Save
+        private int _lastGpFrame = -1;
+        private GamepadButton? _pendingGpModifier = null; // shoulder/trigger held while capturing a combo
+
+        // Gamepad buttons that can act as combo modifiers (shoulders + triggers)
+        private static readonly GamepadButton[] GpModifiers =
+        {
+            GamepadButton.LeftShoulder, GamepadButton.RightShoulder,
+            GamepadButton.LeftTrigger, GamepadButton.RightTrigger
+        };
+
+        // Canonical button set (no enum aliases like A/Cross) used for capture/iteration.
+        private static readonly GamepadButton[] AllButtons =
+        {
+            GamepadButton.South, GamepadButton.East, GamepadButton.North, GamepadButton.West,
+            GamepadButton.LeftShoulder, GamepadButton.RightShoulder,
+            GamepadButton.LeftTrigger, GamepadButton.RightTrigger,
+            GamepadButton.Start, GamepadButton.Select,
+            GamepadButton.LeftStick, GamepadButton.RightStick,
+            GamepadButton.DpadUp, GamepadButton.DpadDown, GamepadButton.DpadLeft, GamepadButton.DpadRight
+        };
 
         public static bool IsVisibleGlobally = false;
         public bool IsVisible => _isVisible;
@@ -56,16 +84,8 @@ namespace FlippingIsHardTrainer
                         UnityEngine.InputSystem.InputSystem.DisableDevice(UnityEngine.InputSystem.Mouse.current);
                 } catch { }
                 
-                // Clone settings for editing
-                _tempSettings = new TrainerSettings
-                {
-                    SavePosition = TrainerConfig.Settings.SavePosition.Clone(),
-                    Teleport = TrainerConfig.Settings.Teleport.Clone(),
-                    ToggleFlyMode = TrainerConfig.Settings.ToggleFlyMode.Clone(),
-                    ToggleKeepVelocity = TrainerConfig.Settings.ToggleKeepVelocity.Clone(),
-                    ToggleKeepAngle = TrainerConfig.Settings.ToggleKeepAngle.Clone(),
-                    OpenBindMenu = TrainerConfig.Settings.OpenBindMenu.Clone()
-                };
+                // Clone settings for editing (keeps Version so SAVE doesn't reset config)
+                _tempSettings = CloneSettings(TrainerConfig.Settings);
                 _listeningAction = null;
             }
         }
@@ -87,7 +107,7 @@ namespace FlippingIsHardTrainer
         public void Draw()
         {
             if (!_isVisible) return;
-            
+
             if (Event.current.type == EventType.Repaint)
             {
                 _clickHandledThisFrame = false;
@@ -99,11 +119,22 @@ namespace FlippingIsHardTrainer
 
             InitStyles();
 
-            // Handle Listening input
+            // Gamepad input — processed ONCE per frame. IMGUI calls Draw() multiple times
+            // per frame (Layout + Repaint), but wasPressedThisFrame stays true across all
+            // those passes; without this guard a single press would both activate listening
+            // AND get captured (or cancel AND close) in the same frame.
+            var gp = Gamepad.current;
+            if (gp != null && Time.frameCount != _lastGpFrame)
+            {
+                _lastGpFrame = Time.frameCount;
+                HandleGamepadInput(gp);
+            }
+
+            // Handle keyboard / mouse listening input
             if (_listeningAction != null)
             {
                 Event e = Event.current;
-                
+
                 // Use raw Input for escape to guarantee it works even if events are swallowed
                 if (Input.GetKeyDown(KeyCode.Escape))
                 {
@@ -154,18 +185,171 @@ namespace FlippingIsHardTrainer
             GUI.backgroundColor = _defaultBgColor;
         }
 
+        private void HandleGamepadInput(Gamepad gp)
+        {
+            if (_listeningAction != null)
+            {
+                // Circle / B cancels capture. The once-per-frame guard prevents this same
+                // press from also closing the menu in a later pass of the frame.
+                if (gp[GamepadButton.East].wasPressedThisFrame)
+                {
+                    FinishListening();
+                    return;
+                }
+
+                // Combo-aware capture — ANY held button can be a modifier:
+                //  - 2 buttons the same frame  → combo (prefer a shoulder/trigger as modifier).
+                //  - 1 button while another is still held → combo (held = modifier).
+                //  - 1 button alone → deferred; becomes a single bind on release, or the
+                //    modifier if a second button arrives while it is held.
+                GamepadButton? first = null, second = null;
+                foreach (var btn in AllButtons)
+                {
+                    if (btn == GamepadButton.East) continue; // reserved for cancel
+                    if (!gp[btn].wasPressedThisFrame) continue;
+                    if (first == null) first = btn;
+                    else { second = btn; break; }
+                }
+
+                if (first.HasValue && second.HasValue)
+                {
+                    GamepadButton main, mod;
+                    if (IsGpModifier(first.Value) && !IsGpModifier(second.Value)) { mod = first.Value; main = second.Value; }
+                    else if (IsGpModifier(second.Value) && !IsGpModifier(first.Value)) { mod = second.Value; main = first.Value; }
+                    else { mod = first.Value; main = second.Value; }
+                    AssignGamepadButton(_listeningAction, main, mod);
+                    FinishListening();
+                    return;
+                }
+
+                if (first.HasValue)
+                {
+                    if (_pendingGpModifier.HasValue && _pendingGpModifier.Value != first.Value &&
+                        gp[_pendingGpModifier.Value].isPressed)
+                    {
+                        AssignGamepadButton(_listeningAction, first.Value, _pendingGpModifier);
+                        FinishListening();
+                        return;
+                    }
+                    _pendingGpModifier = first.Value; // defer
+                    return;
+                }
+
+                // Deferred lone button released without a second button → single bind.
+                if (_pendingGpModifier.HasValue && gp[_pendingGpModifier.Value].wasReleasedThisFrame)
+                {
+                    AssignGamepadButton(_listeningAction, _pendingGpModifier.Value, null);
+                    FinishListening();
+                }
+                return;
+            }
+
+            // Navigation (not listening)
+            bool navUp   = gp.dpad.up.isPressed   || gp.leftStick.y.ReadValue() >  0.7f;
+            bool navDown = gp.dpad.down.isPressed || gp.leftStick.y.ReadValue() < -0.7f;
+
+            if (navUp   && !_wasNavUp)   _selectedIndex = (_selectedIndex - 1 + NAV_ITEM_COUNT) % NAV_ITEM_COUNT;
+            if (navDown && !_wasNavDown) _selectedIndex = (_selectedIndex + 1) % NAV_ITEM_COUNT;
+            _wasNavUp   = navUp;
+            _wasNavDown = navDown;
+
+            if (gp[GamepadButton.South].wasPressedThisFrame)       // A / Cross — activate
+                HandleGamepadActivate(_selectedIndex);
+            else if (gp[GamepadButton.East].wasPressedThisFrame)   // B / Circle — close
+                CloseMenu();
+        }
+
+        private void FinishListening()
+        {
+            _listeningAction = null;
+            _pendingGpModifier = null;
+        }
+
+        private static bool IsGpModifier(GamepadButton btn)
+        {
+            return System.Array.IndexOf(GpModifiers, btn) >= 0;
+        }
+
+        private KeyBind GetBind(string action)
+        {
+            if (_tempSettings == null) return null;
+            return action switch
+            {
+                "Save" => _tempSettings.SavePosition,
+                "Teleport" => _tempSettings.Teleport,
+                "Fly" => _tempSettings.ToggleFlyMode,
+                "Vel" => _tempSettings.ToggleKeepVelocity,
+                "Angle" => _tempSettings.ToggleKeepAngle,
+                "Menu" => _tempSettings.OpenBindMenu,
+                _ => null
+            };
+        }
+
         private void AssignKey(string action, KeyCode main, KeyCode mod)
         {
-            if (_tempSettings == null) return;
-            switch (action)
+            var b = GetBind(action);
+            if (b == null) return;
+            b.MainKey = main;
+            b.Modifier = mod;
+        }
+
+        private void AssignGamepadButton(string action, GamepadButton main, GamepadButton? mod)
+        {
+            var b = GetBind(action);
+            if (b == null) return;
+            b.GamepadBtn = main;
+            b.GamepadModifier = mod;
+        }
+
+        private void HandleGamepadActivate(int index)
+        {
+            string[] bindActions = { "Save", "Teleport", "Fly", "Vel", "Angle", "Menu" };
+            if (index < 6)
             {
-                case "Save": _tempSettings.SavePosition = new KeyBind(main, mod); break;
-                case "Teleport": _tempSettings.Teleport = new KeyBind(main, mod); break;
-                case "Fly": _tempSettings.ToggleFlyMode = new KeyBind(main, mod); break;
-                case "Vel": _tempSettings.ToggleKeepVelocity = new KeyBind(main, mod); break;
-                case "Angle": _tempSettings.ToggleKeepAngle = new KeyBind(main, mod); break;
-                case "Menu": _tempSettings.OpenBindMenu = new KeyBind(main, mod); break;
+                _listeningAction = bindActions[index];
+                _pendingGpModifier = null;
             }
+            else if (index == 6) // Reset Defaults
+            {
+                ResetTempToDefaults();
+            }
+            else if (index == 7) // Cancel
+            {
+                CloseMenu();
+            }
+            else if (index == 8) // Save
+            {
+                SaveTempSettings();
+            }
+        }
+
+        private void ResetTempToDefaults()
+        {
+            TrainerConfig.ResetToDefaults();
+            // Re-clone so the menu visuals update immediately without closing.
+            _tempSettings = CloneSettings(TrainerConfig.Settings);
+        }
+
+        private void SaveTempSettings()
+        {
+            _tempSettings.Version = TrainerSettings.CURRENT_VERSION; // keep version so it isn't wiped on next load
+            TrainerConfig.Settings = _tempSettings;
+            TrainerConfig.Save();
+            CloseMenu();
+        }
+
+        private static TrainerSettings CloneSettings(TrainerSettings src)
+        {
+            return new TrainerSettings
+            {
+                Version            = src.Version,
+                SavePosition       = src.SavePosition.Clone(),
+                Teleport           = src.Teleport.Clone(),
+                ToggleFlyMode      = src.ToggleFlyMode.Clone(),
+                ToggleKeepVelocity = src.ToggleKeepVelocity.Clone(),
+                ToggleKeepAngle    = src.ToggleKeepAngle.Clone(),
+                OpenBindMenu       = src.OpenBindMenu.Clone()
+            };
         }
 
         private void WindowFunction(int id)
@@ -180,40 +364,44 @@ namespace FlippingIsHardTrainer
 
             float cy = 40; // Start below the title bar
 
-            DrawBindRow(20, ref cy, "Save Position", "Save", _tempSettings.SavePosition);
-            DrawBindRow(20, ref cy, "Teleport", "Teleport", _tempSettings.Teleport);
-            DrawBindRow(20, ref cy, "Toggle Fly Mode", "Fly", _tempSettings.ToggleFlyMode);
-            DrawBindRow(20, ref cy, "Toggle Keep Velocity", "Vel", _tempSettings.ToggleKeepVelocity);
-            DrawBindRow(20, ref cy, "Toggle Keep Angle", "Angle", _tempSettings.ToggleKeepAngle);
-            DrawBindRow(20, ref cy, "Open Bind Menu", "Menu", _tempSettings.OpenBindMenu);
+            DrawBindRow(20, ref cy, "Save Position",       "Save",     _tempSettings.SavePosition,      0);
+            DrawBindRow(20, ref cy, "Teleport",            "Teleport", _tempSettings.Teleport,           1);
+            DrawBindRow(20, ref cy, "Toggle Fly Mode",     "Fly",      _tempSettings.ToggleFlyMode,      2);
+            DrawBindRow(20, ref cy, "Toggle Keep Velocity","Vel",      _tempSettings.ToggleKeepVelocity, 3);
+            DrawBindRow(20, ref cy, "Toggle Keep Angle",   "Angle",    _tempSettings.ToggleKeepAngle,    4);
+            DrawBindRow(20, ref cy, "Open Bind Menu",      "Menu",     _tempSettings.OpenBindMenu,       5);
 
-            cy = _windowRect.height - 50; // Bottom row
-            
+            cy = _windowRect.height - 75; // Bottom row
+
+            // Gamepad hint footer (only while the gamepad is the active device)
+            if (Gamepad.current != null && InputDeviceTracker.Current == InputDeviceType.Gamepad)
+            {
+                bool ps = InputDeviceTracker.IsDualShock;
+                string sel = ps ? "Cross" : "A";
+                string close = ps ? "Circle" : "B";
+                GUI.color = new Color(0.7f, 0.9f, 1f);
+                GUI.Label(new Rect(20, cy, 460, 20), $"Mando: D-Pad navegar  |  {sel} seleccionar  |  {close} cancelar/cerrar");
+                GUI.color = Color.white;
+            }
+
+            cy = _windowRect.height - 50;
+
+            GUI.color = _selectedIndex == 6 ? Color.yellow : Color.white;
             if (CustomButton(new Rect(20, cy, 140, 30), "Reset Defaults"))
             {
-                TrainerConfig.ResetToDefaults();
-                
-                // Re-clone settings for editing so visuals update immediately without closing menu
-                _tempSettings = new TrainerSettings
-                {
-                    SavePosition = TrainerConfig.Settings.SavePosition,
-                    Teleport = TrainerConfig.Settings.Teleport,
-                    ToggleFlyMode = TrainerConfig.Settings.ToggleFlyMode,
-                    ToggleKeepVelocity = TrainerConfig.Settings.ToggleKeepVelocity,
-                    ToggleKeepAngle = TrainerConfig.Settings.ToggleKeepAngle,
-                    OpenBindMenu = TrainerConfig.Settings.OpenBindMenu
-                };
+                ResetTempToDefaults();
             }
+            GUI.color = _selectedIndex == 7 ? Color.yellow : Color.white;
             if (CustomButton(new Rect(180, cy, 140, 30), "Cancel"))
             {
                 CloseMenu();
             }
+            GUI.color = _selectedIndex == 8 ? Color.yellow : Color.white;
             if (CustomButton(new Rect(340, cy, 140, 30), "SAVE"))
             {
-                TrainerConfig.Settings = _tempSettings;
-                TrainerConfig.Save();
-                CloseMenu();
+                SaveTempSettings();
             }
+            GUI.color = Color.white;
 
             GUI.DragWindow(new Rect(0, 0, _windowRect.width, 40));
         }
@@ -347,25 +535,32 @@ namespace FlippingIsHardTrainer
             _disabledScripts.Clear();
         }
 
-        private void DrawBindRow(float x, ref float y, string label, string actionId, KeyBind currentBind)
+        private void DrawBindRow(float x, ref float y, string label, string actionId, KeyBind currentBind, int rowIndex)
         {
             GUI.Label(new Rect(x, y, 200, 25), label);
-            
-            string btnText = _listeningAction == actionId ? "[ Press any key (Esc to cancel) ]" : $"[ {currentBind} ]";
-            
-            if (_listeningAction == actionId)
-            {
+
+            bool isListening = _listeningAction == actionId;
+            bool isSelected  = _selectedIndex == rowIndex;
+
+            // Show the binding for whichever device the player is currently using.
+            string bindStr = currentBind.ToString(InputDeviceTracker.Current, InputDeviceTracker.IsDualShock);
+            string btnText = isListening
+                ? "[ Pulsa tecla o botón (Esc / B para cancelar) ]"
+                : $"[ {bindStr} ]";
+
+            if (isListening)
                 GUI.color = Color.green;
-            }
-            
+            else if (isSelected)
+                GUI.color = Color.yellow;
+
             if (CustomButton(new Rect(x + 180, y, 280, 25), btnText))
             {
                 _listeningAction = actionId;
+                _pendingGpModifier = null;
             }
-            
-            // Restore default color
+
             GUI.color = Color.white;
-            
+
             y += 35;
         }
     }

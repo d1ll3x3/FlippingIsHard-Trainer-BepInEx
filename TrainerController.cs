@@ -30,7 +30,18 @@ namespace FlippingIsHardTrainer
         
         // Current state for overlay
         private Vector3 _currentPosition = Vector3.zero;
-        
+
+        // Active-device tracking (auto-switch keyboard <-> gamepad)
+        private InputDeviceType _lastDevice = InputDeviceType.Keyboard;
+
+        // Player freeze while the bind menu is open (stops movement from any input source)
+        private bool _wasMenuVisible = false;
+        private Vector3 _frozenPosition = Vector3.zero;
+        private Quaternion _frozenRotation = Quaternion.identity;
+        private Vector3 _frozenLinVel = Vector3.zero;
+        private Vector3 _frozenAngVel = Vector3.zero;
+        private bool _frozenKinematic = false;
+
         public bool enabled { get; set; }
         
         public void Initialize()
@@ -46,7 +57,7 @@ namespace FlippingIsHardTrainer
                 _overlayRenderer.RefreshKeybinds();
                 _bindMenuRenderer = new BindMenuRenderer(_gameObjectFinder);
                 _bindMenuRenderer.OnMenuClosed = () => {
-                    _overlayRenderer.RefreshKeybinds();
+                    _overlayRenderer.RefreshKeybinds(_lastDevice);
                 };
                 
                 TrainerPlugin.Logger.LogInfo("TrainerController initialized successfully");
@@ -63,21 +74,32 @@ namespace FlippingIsHardTrainer
             try
             {
                 if (!enabled) return;
-                
+
                 // Update input handler
                 _inputHandler.Update();
 
-                // Open bind menu
+                // Track the active device and refresh the HUD when it changes
+                InputDeviceTracker.Update();
+                if (_lastDevice != InputDeviceTracker.Current)
+                {
+                    _lastDevice = InputDeviceTracker.Current;
+                    _overlayRenderer.RefreshKeybinds(_lastDevice);
+                }
+
+                // Open / close bind menu
                 if (_inputHandler.IsOpenBindMenuPressed())
                 {
                     _bindMenuRenderer.ToggleVisibility();
                 }
-                
+
+                // Freeze the player while the menu is open so no input source can move it
+                HandleMenuFreeze();
+
                 // Handle trainer hotkeys only if menu is not visible
                 if (!_bindMenuRenderer.IsVisible)
                 {
                     HandleHotkeys();
-                    
+
                     // Handle fly mode if active
                     if (_flyModeActive)
                     {
@@ -112,6 +134,79 @@ namespace FlippingIsHardTrainer
             }
         }
         
+        private void HandleMenuFreeze()
+        {
+            try
+            {
+                bool menuVisible = _bindMenuRenderer.IsVisible;
+
+                if (menuVisible && !_wasMenuVisible)
+                    BeginFreeze();
+                else if (!menuVisible && _wasMenuVisible)
+                    EndFreeze();
+
+                if (menuVisible)
+                    ApplyFreeze();
+
+                _wasMenuVisible = menuVisible;
+            }
+            catch (Exception ex)
+            {
+                TrainerPlugin.Logger.LogWarning($"Error in HandleMenuFreeze: {ex.Message}");
+            }
+        }
+
+        private void BeginFreeze()
+        {
+            var t = _gameObjectFinder.FindPlayerTransform();
+            if (t != null)
+            {
+                _frozenPosition = t.position;
+                _frozenRotation = t.rotation;
+            }
+
+            var rb = _gameObjectFinder.GetCachedPlayerRigidbody();
+            if (rb != null)
+            {
+                _frozenPosition = rb.position;
+                _frozenRotation = rb.rotation;
+                _frozenLinVel = rb.linearVelocity;
+                _frozenAngVel = rb.angularVelocity;
+                _frozenKinematic = rb.isKinematic;
+                rb.isKinematic = true;
+            }
+        }
+
+        private void ApplyFreeze()
+        {
+            // Body is kinematic while frozen, so only pin position/rotation.
+            // Setting velocity on a kinematic body logs warnings and is unnecessary.
+            var rb = _gameObjectFinder.GetCachedPlayerRigidbody();
+            if (rb != null)
+            {
+                rb.position = _frozenPosition;
+                rb.rotation = _frozenRotation;
+            }
+
+            var t = _gameObjectFinder.FindPlayerTransform();
+            if (t != null)
+            {
+                t.position = _frozenPosition;
+                t.rotation = _frozenRotation;
+            }
+        }
+
+        private void EndFreeze()
+        {
+            var rb = _gameObjectFinder.GetCachedPlayerRigidbody();
+            if (rb != null)
+            {
+                rb.isKinematic = _frozenKinematic;
+                rb.linearVelocity = _frozenLinVel;
+                rb.angularVelocity = _frozenAngVel;
+            }
+        }
+
         private void HandleHotkeys()
         {
             // Save position (Shift + R)
@@ -294,10 +389,9 @@ namespace FlippingIsHardTrainer
                     {
                         rigidbody.useGravity = _wasUsingGravity;
                         rigidbody.detectCollisions = _wasDetectingCollisions;
-                        
-                        // Reseteamos inercia al salir del modo vuelo
-                        rigidbody.linearVelocity = Vector3.zero;
-                        rigidbody.angularVelocity = Vector3.zero;
+
+                        // Conservamos el momento de vuelo al salir: dejamos la velocidad
+                        // actual intacta para que el impulso se mantenga.
                     }
                 }
                 
