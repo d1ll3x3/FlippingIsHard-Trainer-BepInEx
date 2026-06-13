@@ -11,13 +11,15 @@ A highly optimized Unity IL2CPP BepInEx plugin for "Flipping is Hard Demo" that 
 - **✈️ Smooth Noclip Fly Mode** - Toggle free-camera ghost flight with `F` key
   - Physics-integrated movement for buttery smooth traversal
   - Noclip enabled: Fly directly through walls, floors, and obstacles
-  - Camera-relative movement with WASD (follows where you look)
-  - Vertical movement with Space/Ctrl
-  - Speed boost with Shift (3x faster)
-- **⚙️ In-Game Customizable Keybinds** - Press `B` to open the fully featured Bind Menu!
-  - Remap any trainer action directly inside the game.
+  - Camera-relative movement with WASD / Left Stick (follows where you look)
+  - Vertical movement with Space/Ctrl or RT/LT (R2/L2)
+  - Speed boost with Shift or B/Circle (3x faster)
+  - **Momentum conserved on exit**: velocity carries over when you leave fly mode
+- **⚙️ In-Game Customizable Keybinds** - Press `B` (or `L1+R1` on a gamepad) to open the fully featured Bind Menu!
+  - Remap any trainer action directly inside the game, with **keyboard or gamepad** (incl. 2-button gamepad combos).
   - Automatically isolates inputs so you don't accidentally move while editing.
   - Auto-creates and saves to `com.flippingishard.trainer.json` in BepInEx config.
+- **🎮 Full Gamepad Support** - Xbox & PlayStation controllers, with the overlay/menu auto-switching to the device you're using.
 - **📍 Real-time Telemetry** - HUD in the top-right corner showing current `SPEED`, `HEIGHT`, and `XYZ` position
 - **🎮 Smart Overlay** - Real-time UI showing controls, active toggles, and saved position state
 - **⚡ Ultra Optimized** - Rewritten from scratch to eliminate lag spikes and stuttering during gameplay.
@@ -34,18 +36,31 @@ A highly optimized Unity IL2CPP BepInEx plugin for "Flipping is Hard Demo" that 
 3. Start the game.
 
 ### 3. **Use In-Game**
-- **`B`** → Open the **Keybinds Menu** to customize all controls in real-time.
-- **`Shift + R`** → Save current position, rotation, and physical velocity
-- **`R`** → Teleport to saved position
-- **`V`** → Toggle restoring physical velocity upon teleport
-- **`C`** → Toggle restoring angle/trajectory globally vs camera-relative
-- **`F`** → Toggle Smooth Noclip Fly Mode ON/OFF
+
+The trainer supports **keyboard and gamepad** (Xbox & PlayStation). The overlay and bind
+menu **auto-switch** to show the controls of whichever device you are currently using.
+
+**Default keybinds** (Keyboard / Gamepad Xbox / PlayStation):
+
+| Action                       | Keyboard    | Xbox      | PlayStation |
+|------------------------------|-------------|-----------|-------------|
+| Open Keybinds Menu           | `B`         | LB + RB   | L1 + R1     |
+| Save position                | `Shift + R` | LB + X    | L1 + Square |
+| Teleport to saved position   | `R`         | X         | Square      |
+| Toggle Fly Mode              | `F`         | L3        | L3          |
+| Toggle Keep Velocity         | `V`         | D-Left    | D-Left      |
+| Toggle Keep Angle            | `C`         | D-Right   | D-Right     |
+
+All binds are remappable in the **Keybinds Menu**, including **2-button gamepad combos**
+(hold any button and press another). Navigate the menu with the D-Pad/stick,
+**A/Cross** to select, **B/Circle** to cancel an assignment or close the menu.
+
 - **Fly Mode Controls:**
-  - `W` / `S` → Move forward/backward (relative to camera)
-  - `A` / `D` → Move left/right (relative to camera)
-  - `Space` → Move up (world space)
-  - `Ctrl` → Move down (world space)
-  - **`Shift` (hold)** → Speed boost (3x faster)
+  - `W` / `S` or **Left Stick** → Move forward/backward (relative to camera)
+  - `A` / `D` or **Left Stick** → Move left/right (relative to camera)
+  - `Space` or **RT/R2** → Move up (world space)
+  - `Ctrl` or **LT/L2** → Move down (world space)
+  - **`Shift` (hold)** or **B/Circle** → Speed boost (3x faster)
 
 ## 📁 Project Structure
 ```text
