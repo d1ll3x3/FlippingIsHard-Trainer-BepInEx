@@ -31,13 +31,16 @@ namespace FlippingIsHardTrainer
         private string _strMenu;
         private string _strFlyControls = "     WASD / Space / Ctrl  +  Shift=Turbo";
 
-        // Layout constants
-        private const int CTRL_W = 420;
-        private const int CTRL_H = 236;
-        private const int CTRL_H_FLY = 284;
-        private const int COORD_W = 240;
-        private const int COORD_H = 92;
-        private const int PAD = 20;
+        // Base layout constants (scaled at draw time)
+        private const float BASE_CTRL_W     = 420f;
+        private const float BASE_CTRL_H     = 236f;
+        private const float BASE_CTRL_H_FLY = 284f;
+        private const float BASE_COORD_W    = 240f;
+        private const float BASE_COORD_H    = 92f;
+        private const float BASE_PAD        = 20f;
+
+        private float Scale => Mathf.Clamp(TrainerConfig.Settings.OverlayScale, 0.25f, 2.0f);
+        private float _cachedScale = -1f;
 
         // Colors
         private readonly Color _bgColor    = new Color(0.08f, 0.08f, 0.08f, 0.85f);
@@ -49,7 +52,7 @@ namespace FlippingIsHardTrainer
         private readonly Color _ctrlColor   = new Color(1.0f,  0.7f,  0.4f,  1.0f);
         private readonly Color _dangerColor = new Color(0.8f,  0.3f,  0.3f,  1.0f);
 
-        // Styles — created lazily inside OnGUI
+        // Styles — rebuilt when scale changes
         private GUIStyle _styleHeader;
         private GUIStyle _styleText;
         private bool _stylesReady = false;
@@ -122,18 +125,18 @@ namespace FlippingIsHardTrainer
 
         private void EnsureStyles()
         {
-            if (_stylesReady) return;
+            float scale = Scale;
+            if (_stylesReady && Mathf.Approximately(_cachedScale, scale)) return;
+            _cachedScale = scale;
 
-            // In IL2CPP interop, GUIStyle() default constructor works fine.
-            // We copy from GUI.skin.label using the Pointer property.
             _styleHeader = new GUIStyle();
-            _styleHeader.fontSize = 22;
+            _styleHeader.fontSize = Mathf.RoundToInt(22 * scale);
             _styleHeader.fontStyle = FontStyle.Bold;
             _styleHeader.normal.textColor = _headerColor;
             _styleHeader.alignment = TextAnchor.UpperLeft;
 
             _styleText = new GUIStyle();
-            _styleText.fontSize = 18;
+            _styleText.fontSize = Mathf.RoundToInt(18 * scale);
             _styleText.fontStyle = FontStyle.Bold;
             _styleText.normal.textColor = Color.white;
             _styleText.alignment = TextAnchor.UpperLeft;
@@ -145,79 +148,82 @@ namespace FlippingIsHardTrainer
 
         private void DrawControls()
         {
-            float h = _flyModeActive ? CTRL_H_FLY : CTRL_H;
-            float x = PAD;
-            float y = Screen.height - h - PAD;
+            float sc = Scale;
+            float h = (_flyModeActive ? BASE_CTRL_H_FLY : BASE_CTRL_H) * sc;
+            float x = BASE_PAD;
+            float y = Screen.height - h - BASE_PAD;
+            float w = BASE_CTRL_W * sc;
 
-            DrawBox(x, y, CTRL_W, h);
+            DrawBox(x, y, w, h);
 
-            float cx = x + 10;
-            float cy = y + 12;
+            float lw   = (BASE_CTRL_W - 20f) * sc;
+            float cx   = x + 10f * sc;
+            float cy   = y + 12f * sc;
+            float lineH   = 24f * sc;
+            float headerH = 28f * sc;
 
             // Header
             _styleHeader.normal.textColor = _headerColor;
-            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 28), "  FLIPPING IS HARD TRAINER", _styleHeader);
-            cy += 28;
+            GUI.Label(new Rect(cx, cy, lw, headerH), "  FLIPPING IS HARD TRAINER", _styleHeader);
+            cy += headerH;
 
             // Fly mode status
             if (_flyModeActive)
             {
                 _styleText.normal.textColor = _flyColor;
-                GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), "  \u00bb FLY MODE ACTIVE", _styleText);
-                cy += 24;
+                GUI.Label(new Rect(cx, cy, lw, lineH), "  \u00bb FLY MODE ACTIVE", _styleText);
+                cy += lineH;
                 _styleText.normal.textColor = _dimColor;
-                GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), _strFlyControls, _styleText);
-                cy += 24;
+                GUI.Label(new Rect(cx, cy, lw, lineH), _strFlyControls, _styleText);
+                cy += lineH;
             }
 
-            // Shift+R
             _styleText.normal.textColor = Color.white;
-            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), _strSave, _styleText);
-            cy += 24;
+            GUI.Label(new Rect(cx, cy, lw, lineH), _strSave, _styleText);
+            cy += lineH;
 
-            // R
             _styleText.normal.textColor = _hasSavedPosition ? _savedColor : _dimColor;
-            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), _hasSavedPosition ? _strTelReady : _strTelSave, _styleText);
-            cy += 24;
+            GUI.Label(new Rect(cx, cy, lw, lineH), _hasSavedPosition ? _strTelReady : _strTelSave, _styleText);
+            cy += lineH;
 
-            // F
             _styleText.normal.textColor = _ctrlColor;
-            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), _strFly, _styleText);
-            cy += 24;
+            GUI.Label(new Rect(cx, cy, lw, lineH), _strFly, _styleText);
+            cy += lineH;
 
-            // V
             _styleText.normal.textColor = _keepVelocityActive ? _savedColor : _dimColor;
-            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), _keepVelocityActive ? _strVelOn : _strVelOff, _styleText);
-            cy += 24;
+            GUI.Label(new Rect(cx, cy, lw, lineH), _keepVelocityActive ? _strVelOn : _strVelOff, _styleText);
+            cy += lineH;
 
-            // C
             _styleText.normal.textColor = _keepAngleActive ? _savedColor : _dimColor;
-            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), _keepAngleActive ? _strAngOn : _strAngOff, _styleText);
-            cy += 24;
-            
-            // Menu
+            GUI.Label(new Rect(cx, cy, lw, lineH), _keepAngleActive ? _strAngOn : _strAngOff, _styleText);
+            cy += lineH;
+
             _styleText.normal.textColor = _dimColor;
-            GUI.Label(new Rect(cx, cy, CTRL_W - 20, 24), _strMenu, _styleText);
+            GUI.Label(new Rect(cx, cy, lw, lineH), _strMenu, _styleText);
         }
 
         // ── Coordinates overlay (top-right) ─────────────────────────────────
 
         private void DrawCoords()
         {
-            float x = Screen.width - COORD_W - PAD;
-            float y = PAD;
+            float sc = Scale;
+            float cw = BASE_COORD_W * sc;
+            float ch = BASE_COORD_H * sc;
+            float x  = Screen.width - cw - BASE_PAD;
+            float y  = BASE_PAD;
 
-            DrawBox(x, y, COORD_W, COORD_H);
+            DrawBox(x, y, cw, ch);
 
-            float cx = x + 12;
-            float cy = y + 10;
+            float cx    = x + 12f * sc;
+            float cy    = y + 10f * sc;
+            float labelH = 24f * sc;
 
             _styleText.normal.textColor = Color.white;
-            GUI.Label(new Rect(cx, cy, COORD_W - 24, 22), _cachedSpeedStr, _styleText);
-            cy += 24;
-            GUI.Label(new Rect(cx, cy, COORD_W - 24, 22), _cachedHeightStr, _styleText);
-            cy += 24;
-            GUI.Label(new Rect(cx, cy, COORD_W - 24, 22), _cachedCoordsStr, _styleText);
+            GUI.Label(new Rect(cx, cy, cw - 24f * sc, labelH), _cachedSpeedStr, _styleText);
+            cy += labelH;
+            GUI.Label(new Rect(cx, cy, cw - 24f * sc, labelH), _cachedHeightStr, _styleText);
+            cy += labelH;
+            GUI.Label(new Rect(cx, cy, cw - 24f * sc, labelH), _cachedCoordsStr, _styleText);
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────

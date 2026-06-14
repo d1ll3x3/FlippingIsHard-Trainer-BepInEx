@@ -28,9 +28,11 @@ namespace FlippingIsHardTrainer
 
         // Gamepad navigation state
         private int _selectedIndex = 0;
-        private bool _wasNavUp = false;
-        private bool _wasNavDown = false;
-        private const int NAV_ITEM_COUNT = 9; // 6 bind rows + Reset + Cancel + Save
+        private bool _wasNavUp    = false;
+        private bool _wasNavDown  = false;
+        private bool _wasNavLeft  = false;
+        private bool _wasNavRight = false;
+        private const int NAV_ITEM_COUNT = 10; // 6 bind rows + HUD Scale + Reset + Cancel + Save
         private int _lastGpFrame = -1;
         private GamepadButton? _pendingGpModifier = null; // shoulder/trigger held while capturing a combo
 
@@ -245,13 +247,24 @@ namespace FlippingIsHardTrainer
             }
 
             // Navigation (not listening)
-            bool navUp   = gp.dpad.up.isPressed   || gp.leftStick.y.ReadValue() >  0.7f;
-            bool navDown = gp.dpad.down.isPressed || gp.leftStick.y.ReadValue() < -0.7f;
+            bool navUp    = gp.dpad.up.isPressed    || gp.leftStick.y.ReadValue() >  0.7f;
+            bool navDown  = gp.dpad.down.isPressed  || gp.leftStick.y.ReadValue() < -0.7f;
+            bool navLeft  = gp.dpad.left.isPressed  || gp.leftStick.x.ReadValue() < -0.7f;
+            bool navRight = gp.dpad.right.isPressed || gp.leftStick.x.ReadValue() >  0.7f;
 
             if (navUp   && !_wasNavUp)   _selectedIndex = (_selectedIndex - 1 + NAV_ITEM_COUNT) % NAV_ITEM_COUNT;
             if (navDown && !_wasNavDown) _selectedIndex = (_selectedIndex + 1) % NAV_ITEM_COUNT;
             _wasNavUp   = navUp;
             _wasNavDown = navDown;
+
+            // Left/Right adjusts HUD Scale when that row is selected
+            if (_selectedIndex == 6)
+            {
+                if (navLeft  && !_wasNavLeft)  AdjustTempScale(-0.05f);
+                if (navRight && !_wasNavRight) AdjustTempScale(+0.05f);
+            }
+            _wasNavLeft  = navLeft;
+            _wasNavRight = navRight;
 
             if (gp[GamepadButton.South].wasPressedThisFrame)       // A / Cross — activate
                 HandleGamepadActivate(_selectedIndex);
@@ -309,15 +322,19 @@ namespace FlippingIsHardTrainer
                 _listeningAction = bindActions[index];
                 _pendingGpModifier = null;
             }
-            else if (index == 6) // Reset Defaults
+            else if (index == 6) // HUD Scale — A increments (use ◄ ► to dec/inc)
+            {
+                AdjustTempScale(+0.05f);
+            }
+            else if (index == 7) // Reset Defaults
             {
                 ResetTempToDefaults();
             }
-            else if (index == 7) // Cancel
+            else if (index == 8) // Cancel
             {
                 CloseMenu();
             }
-            else if (index == 8) // Save
+            else if (index == 9) // Save
             {
                 SaveTempSettings();
             }
@@ -348,8 +365,16 @@ namespace FlippingIsHardTrainer
                 ToggleFlyMode      = src.ToggleFlyMode.Clone(),
                 ToggleKeepVelocity = src.ToggleKeepVelocity.Clone(),
                 ToggleKeepAngle    = src.ToggleKeepAngle.Clone(),
-                OpenBindMenu       = src.OpenBindMenu.Clone()
+                OpenBindMenu       = src.OpenBindMenu.Clone(),
+                OverlayScale       = src.OverlayScale,
             };
+        }
+
+        private void AdjustTempScale(float delta)
+        {
+            if (_tempSettings == null) return;
+            float next = Mathf.Clamp(_tempSettings.OverlayScale + delta, 0.25f, 2.0f);
+            _tempSettings.OverlayScale = Mathf.Round(next * 100f) / 100f;
         }
 
         private void WindowFunction(int id)
@@ -371,6 +396,21 @@ namespace FlippingIsHardTrainer
             DrawBindRow(20, ref cy, "Toggle Keep Angle",   "Angle",    _tempSettings.ToggleKeepAngle,    4);
             DrawBindRow(20, ref cy, "Open Bind Menu",      "Menu",     _tempSettings.OpenBindMenu,       5);
 
+            // ── HUD Scale row ────────────────────────────────────────────
+            cy += 4;
+            GUI.color = _selectedIndex == 6 ? Color.yellow : Color.white;
+            GUI.Label(new Rect(20, cy, 175, 24), "HUD Scale");
+            GUI.color = Color.white;
+            GUI.backgroundColor = new Color(0.4f, 0.4f, 0.4f, 1f);
+            if (CustomButton(new Rect(195, cy, 32, 24), "-"))
+                AdjustTempScale(-0.05f);
+            GUI.Label(new Rect(232, cy, 55, 24), $"{_tempSettings.OverlayScale:F2}x");
+            if (CustomButton(new Rect(292, cy, 32, 24), "+"))
+                AdjustTempScale(+0.05f);
+            GUI.backgroundColor = _defaultBgColor;
+            GUI.color = Color.white;
+            cy += 30;
+
             cy = _windowRect.height - 75; // Bottom row
 
             // Gamepad hint footer (only while the gamepad is the active device)
@@ -379,24 +419,27 @@ namespace FlippingIsHardTrainer
                 bool ps = InputDeviceTracker.IsDualShock;
                 string sel = ps ? "Cross" : "A";
                 string close = ps ? "Circle" : "B";
+                string hint = _selectedIndex == 6
+                    ? $"Mando: ◄ ► ajustar escala  |  {close} cancelar/cerrar"
+                    : $"Mando: D-Pad navegar  |  {sel} seleccionar  |  {close} cancelar/cerrar";
                 GUI.color = new Color(0.7f, 0.9f, 1f);
-                GUI.Label(new Rect(20, cy, 460, 20), $"Mando: D-Pad navegar  |  {sel} seleccionar  |  {close} cancelar/cerrar");
+                GUI.Label(new Rect(20, cy, 460, 20), hint);
                 GUI.color = Color.white;
             }
 
             cy = _windowRect.height - 50;
 
-            GUI.color = _selectedIndex == 6 ? Color.yellow : Color.white;
+            GUI.color = _selectedIndex == 7 ? Color.yellow : Color.white;
             if (CustomButton(new Rect(20, cy, 140, 30), "Reset Defaults"))
             {
                 ResetTempToDefaults();
             }
-            GUI.color = _selectedIndex == 7 ? Color.yellow : Color.white;
+            GUI.color = _selectedIndex == 8 ? Color.yellow : Color.white;
             if (CustomButton(new Rect(180, cy, 140, 30), "Cancel"))
             {
                 CloseMenu();
             }
-            GUI.color = _selectedIndex == 8 ? Color.yellow : Color.white;
+            GUI.color = _selectedIndex == 9 ? Color.yellow : Color.white;
             if (CustomButton(new Rect(340, cy, 140, 30), "SAVE"))
             {
                 SaveTempSettings();

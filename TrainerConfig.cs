@@ -107,6 +107,7 @@ namespace FlippingIsHardTrainer
             { GamepadBtn = GamepadButton.DpadRight };
         public KeyBind OpenBindMenu { get; set; } = new KeyBind(KeyCode.B)
             { GamepadModifier = GamepadButton.LeftShoulder, GamepadBtn = GamepadButton.RightShoulder };
+        public float OverlayScale { get; set; } = 1.0f;
     }
 
     public static class TrainerConfig
