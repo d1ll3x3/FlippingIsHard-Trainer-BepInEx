@@ -15,13 +15,15 @@ namespace FlippingIsHardTrainer
         private bool _flyModeActive = false;
         private bool _keepVelocityActive = false;
         private bool _keepAngleActive = false;
-        private bool _wasUsingGravity = true;
-        private bool _wasDetectingCollisions = true;
-        
-        // Configuration
-        private float _flySpeed = 15.0f;
+
+        // Fly mode (trainer-owned, position-based so it works on the game's kinematic body)
+        private bool _flyWasKinematic = false;
+        private bool _flyWasGravity = true;
+        private bool _flyWasCollisions = true;
+        private float _flySpeed = 18.0f;
         private float _flySpeedBoost = 3.0f;
-        
+        private Vector3 _lastFlyVelocity = Vector3.zero; // momentum carried over when exiting fly
+
         // Component references
         private GameObjectFinder _gameObjectFinder;
         private InputHandler _inputHandler;
@@ -86,6 +88,11 @@ namespace FlippingIsHardTrainer
                     _overlayRenderer.RefreshKeybinds(_lastDevice);
                 }
 
+                // Disable the game's OWN fly cheat so its Shift+F toggle can never start a
+                // second, separate fly (our turbo is Shift, our fly is F, so Shift+F would
+                // otherwise trigger the game's native fly).
+                DisableNativeFly();
+
                 // Open / close bind menu
                 if (_inputHandler.IsOpenBindMenuPressed())
                 {
@@ -100,11 +107,8 @@ namespace FlippingIsHardTrainer
                 {
                     HandleHotkeys();
 
-                    // Handle fly mode if active
                     if (_flyModeActive)
-                    {
                         HandleFlyMode();
-                    }
                 }
                 
                 // Reducimos la frecuencia de actualización de UI a 1 vez cada varios frames para evitar lag
@@ -365,96 +369,125 @@ namespace FlippingIsHardTrainer
             }
         }
         
+        // Hard-disable the game's native fly cheat component so it can never run. Its toggle
+        // is Shift+F, which collides with the trainer's fly (F) + turbo (Shift); disabling the
+        // component stops its FixedUpdate/HandleFlying entirely, leaving ONLY the trainer's fly.
+        private void DisableNativeFly()
+        {
+            try
+            {
+                var flyCheat = _gameObjectFinder.GetFlyCheat();
+                if (flyCheat != null && flyCheat.enabled)
+                {
+                    flyCheat.enabled = false;
+                    TrainerPlugin.Logger.LogInfo("[FLY] Disabled native EHS.FlyCheat (only trainer fly remains).");
+                }
+            }
+            catch (Exception ex)
+            {
+                TrainerPlugin.Logger.LogWarning($"[FLY] Error disabling native fly: {ex.Message}");
+            }
+        }
+
         private void ToggleFlyMode()
         {
             try
             {
                 _flyModeActive = !_flyModeActive;
                 _overlayRenderer.SetFlyModeActive(_flyModeActive);
-                
-                var rigidbody = _gameObjectFinder.GetCachedPlayerRigidbody();
-                if (rigidbody != null)
+
+                var rb = _gameObjectFinder.GetCachedPlayerRigidbody();
+                if (rb != null)
                 {
                     if (_flyModeActive)
                     {
-                        _wasUsingGravity = rigidbody.useGravity;
-                        _wasDetectingCollisions = rigidbody.detectCollisions;
-                        
-                        rigidbody.useGravity = false;
-                        rigidbody.detectCollisions = false;
-                        rigidbody.linearVelocity = Vector3.zero;
-                        rigidbody.angularVelocity = Vector3.zero;
+                        // Take full manual control: kinematic so the game's physics/prediction
+                        // doesn't fight us, no gravity, no collisions (noclip). We move by
+                        // position, which is valid on a kinematic body (no velocity warnings).
+                        _flyWasKinematic = rb.isKinematic;
+                        _flyWasGravity = rb.useGravity;
+                        _flyWasCollisions = rb.detectCollisions;
+
+                        rb.isKinematic = true;
+                        rb.useGravity = false;
+                        rb.detectCollisions = false;
                     }
                     else
                     {
-                        rigidbody.useGravity = _wasUsingGravity;
-                        rigidbody.detectCollisions = _wasDetectingCollisions;
+                        rb.useGravity = _flyWasGravity;
+                        rb.detectCollisions = _flyWasCollisions;
+                        rb.isKinematic = _flyWasKinematic;
 
-                        // Conservamos el momento de vuelo al salir: dejamos la velocidad
-                        // actual intacta para que el impulso se mantenga.
+                        // Conserve momentum: carry the last fly velocity over. Set it AFTER
+                        // restoring the non-kinematic state so it actually applies (and no
+                        // "velocity on kinematic body" warning). If you weren't moving when you
+                        // exited, _lastFlyVelocity is ~0 and you simply drop.
+                        if (!rb.isKinematic)
+                        {
+                            rb.linearVelocity = _lastFlyVelocity;
+                            rb.angularVelocity = Vector3.zero;
+                        }
                     }
                 }
-                
-                TrainerPlugin.Logger.LogInfo($"Fly mode {(_flyModeActive ? "activated" : "deactivated")}");
+
+                TrainerPlugin.Logger.LogInfo($"[FLY] Trainer fly {(_flyModeActive ? "ON" : "OFF")}");
             }
             catch (Exception ex)
             {
                 TrainerPlugin.Logger.LogError($"Error toggling fly mode: {ex}");
             }
         }
-        
+
         private void HandleFlyMode()
         {
             try
             {
                 var cameraTransform = _gameObjectFinder.FindCameraTransform();
-                var rigidbody = _gameObjectFinder.GetCachedPlayerRigidbody();
-                
-                if (cameraTransform == null || rigidbody == null)
-                    return;
-                
-                // Calculate target velocity based on input
-                Vector3 targetVelocity = CalculateFlyVelocity(cameraTransform);
-                
-                // Apply velocity directly (smooth physical integration & noclip)
-                rigidbody.linearVelocity = targetVelocity;
-                rigidbody.angularVelocity = Vector3.zero;
+                var rb = _gameObjectFinder.GetCachedPlayerRigidbody();
+                if (cameraTransform == null || rb == null) return;
+
+                Vector3 flyVelocity = CalculateFlyVelocity(cameraTransform);
+                _lastFlyVelocity = flyVelocity; // remembered for momentum on exit
+
+                Vector3 displacement = flyVelocity * Time.deltaTime;
+                if (displacement == Vector3.zero) return;
+
+                // Move by position (kinematic-safe; setting velocity would be ignored + warn).
+                Vector3 target = rb.position + displacement;
+                rb.position = target;
+                var t = _gameObjectFinder.FindPlayerTransform();
+                if (t != null) t.position = target;
             }
             catch (Exception ex)
             {
                 TrainerPlugin.Logger.LogError($"Error in HandleFlyMode: {ex}");
             }
         }
-        
+
         private Vector3 CalculateFlyVelocity(Transform cameraTransform)
         {
-            // Get camera forward and right vectors (horizontal plane only)
+            // Horizontal movement relative to where the camera looks.
             Vector3 forward = cameraTransform.forward;
             Vector3 right = cameraTransform.right;
             forward.y = 0;
             right.y = 0;
-            
             if (forward.magnitude > 0.001f) forward.Normalize();
             if (right.magnitude > 0.001f) right.Normalize();
-            
-            // Calculate speed
+
             float speed = _flySpeed;
-            if (_inputHandler.IsShiftPressed())
-                speed *= _flySpeedBoost;
-            
-            // Calculate velocity vector
+            if (_inputHandler.IsShiftPressed()) speed *= _flySpeedBoost;
+
             Vector3 velocity = Vector3.zero;
-            
             if (_inputHandler.IsWPressed()) velocity += forward * speed;
             if (_inputHandler.IsSPressed()) velocity -= forward * speed;
             if (_inputHandler.IsAPressed()) velocity -= right * speed;
             if (_inputHandler.IsDPressed()) velocity += right * speed;
             if (_inputHandler.IsSpacePressed()) velocity.y += speed;
             if (_inputHandler.IsCtrlPressed()) velocity.y -= speed;
-            
+
             return velocity;
         }
-        
+
         private void UpdateCurrentPosition()
         {
             try

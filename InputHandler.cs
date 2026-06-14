@@ -85,26 +85,40 @@ namespace FlippingIsHardTrainer
             return Input.GetKey(modifier);
         }
 
-        private bool IsAnyModifierHeld()
+        // All trainer binds, so a no-modifier bind can check for a real competing combo
+        // (same main key/button + a modifier currently held) instead of blocking on ANY
+        // modifier. This lets e.g. F (Fly) fire while Shift is held for turbo, yet keeps
+        // Save (Shift+R) winning over Teleport (R) when Shift is down.
+        private static KeyBind[] AllBinds()
         {
-            return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) ||
-                   Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl) ||
-                   Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
+            var s = TrainerConfig.Settings;
+            return new[] { s.SavePosition, s.Teleport, s.ToggleFlyMode,
+                           s.ToggleKeepVelocity, s.ToggleKeepAngle, s.OpenBindMenu };
         }
 
-        // Gamepad buttons usable as combo modifiers (shoulders + triggers).
-        private static readonly GamepadButton[] GamepadModifiers =
+        // True if another bind shares this bind's main key but requires a modifier that is
+        // currently held — that combo takes priority, so this no-modifier bind is suppressed.
+        private bool KeyboardComboConflict(KeyBind bind)
         {
-            GamepadButton.LeftShoulder, GamepadButton.RightShoulder,
-            GamepadButton.LeftTrigger, GamepadButton.RightTrigger
-        };
-
-        private bool IsAnyGamepadModifierHeld(Gamepad gp, GamepadButton exclude)
-        {
-            foreach (var mod in GamepadModifiers)
+            foreach (var other in AllBinds())
             {
-                if (mod == exclude) continue;
-                if (gp[mod].isPressed) return true;
+                if (other == bind) continue;
+                if (other.MainKey == bind.MainKey && other.Modifier != KeyCode.None
+                    && IsModifierHeld(other.Modifier))
+                    return true;
+            }
+            return false;
+        }
+
+        // Gamepad equivalent: another bind shares this button but its modifier is held now.
+        private bool GamepadComboConflict(Gamepad gp, KeyBind bind)
+        {
+            foreach (var other in AllBinds())
+            {
+                if (other == bind) continue;
+                if (other.GamepadBtn == bind.GamepadBtn && other.GamepadModifier.HasValue
+                    && gp[other.GamepadModifier.Value].isPressed)
+                    return true;
             }
             return false;
         }
@@ -116,9 +130,10 @@ namespace FlippingIsHardTrainer
             bool isMainHeld = Input.GetKey(bind.MainKey);
             bool isModHeld = IsModifierHeld(bind.Modifier);
 
-            // Si el bind exige modificador, tiene que estar pulsado.
-            // Si no exige modificador, NO debe haber ningún modificador pulsado para evitar conflictos.
-            bool modValid = (bind.Modifier == KeyCode.None) ? !IsAnyModifierHeld() : isModHeld;
+            // Si el bind exige modificador, tiene que estar pulsado. Si no exige modificador,
+            // solo se suprime cuando hay un combo real en conflicto (misma tecla + su
+            // modificador pulsado), no ante cualquier modificador suelto.
+            bool modValid = (bind.Modifier == KeyCode.None) ? !KeyboardComboConflict(bind) : isModHeld;
 
             return isMainHeld && modValid;
         }
@@ -131,7 +146,7 @@ namespace FlippingIsHardTrainer
             bool mainHeld = gp[bind.GamepadBtn.Value].isPressed;
             bool modValid = bind.GamepadModifier.HasValue
                 ? gp[bind.GamepadModifier.Value].isPressed
-                : !IsAnyGamepadModifierHeld(gp, bind.GamepadBtn.Value);
+                : !GamepadComboConflict(gp, bind);
 
             return mainHeld && modValid;
         }

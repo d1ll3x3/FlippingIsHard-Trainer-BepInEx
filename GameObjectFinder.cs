@@ -18,6 +18,43 @@ namespace FlippingIsHardTrainer
         private const float SEARCH_COOLDOWN_DURATION = 2f;
         
         public Rigidbody GetCachedPlayerRigidbody() => _cachedPlayerRigidbody;
+
+        // Cached references to the game's own fly cheat and its hotkey handler.
+        private EHS.FlyCheat _cachedFlyCheat;
+        private global::CheatsHotKeyHandlerMono _cachedCheatsHandler;
+
+        // The game's native fly cheat component (FlyCheat.SetExternalFlyEnabled / IsFlying).
+        public EHS.FlyCheat GetFlyCheat()
+        {
+            if (_cachedFlyCheat != null)
+                return _cachedFlyCheat;
+            try
+            {
+                _cachedFlyCheat = UnityEngine.Object.FindObjectOfType<EHS.FlyCheat>();
+            }
+            catch (Exception)
+            {
+                // Silent catch
+            }
+            return _cachedFlyCheat;
+        }
+
+        // The game's cheat hotkey handler. We disable it so the game doesn't toggle fly on
+        // its own keys (the trainer becomes the sole controller of the fly cheat).
+        public global::CheatsHotKeyHandlerMono GetCheatsHotKeyHandler()
+        {
+            if (_cachedCheatsHandler != null)
+                return _cachedCheatsHandler;
+            try
+            {
+                _cachedCheatsHandler = UnityEngine.Object.FindObjectOfType<global::CheatsHotKeyHandlerMono>();
+            }
+            catch (Exception)
+            {
+                // Silent catch
+            }
+            return _cachedCheatsHandler;
+        }
         
         public Transform FindPlayerTransform()
         {
@@ -96,6 +133,8 @@ namespace FlippingIsHardTrainer
             _cachedPlayer = null;
             _cachedPlayerRigidbody = null;
             _cachedCamera = null;
+            _cachedFlyCheat = null;
+            _cachedCheatsHandler = null;
         }
     }
 }
