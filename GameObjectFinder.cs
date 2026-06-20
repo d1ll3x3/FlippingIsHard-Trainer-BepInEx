@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Il2CppInterop.Runtime;
 
 namespace FlippingIsHardTrainer
 {
@@ -70,20 +71,24 @@ namespace FlippingIsHardTrainer
         
         public GameObject FindPlayer()
         {
-            // Return cached player if still valid
+            // Return cached player if still valid. Unity overloads == so a destroyed
+            // object (scene change / respawn) compares as null, auto-invalidating the cache.
             if (_cachedPlayer != null)
                 return _cachedPlayer;
-                
+
             // Check cooldown si ha fallado recientemente
             if (Time.time < _playerSearchCooldown)
                 return null;
-            
-            // Method 1: Try to find by tag
+
             try
             {
-                _cachedPlayer = GameObject.FindWithTag("Player");
-                if (_cachedPlayer != null)
+                // Multiplayer: there can be several "Player"-tagged objects (one per client).
+                // We must control ONLY the local player; touching a remote player's rigidbody
+                // does nothing useful (no network authority — the server overwrites it).
+                var local = FindLocalPlayer();
+                if (local != null)
                 {
+                    _cachedPlayer = local;
                     _cachedPlayerRigidbody = _cachedPlayer.GetComponent<Rigidbody>();
                     return _cachedPlayer;
                 }
@@ -92,11 +97,100 @@ namespace FlippingIsHardTrainer
             {
                 // Silent catch
             }
-            
+
             // Si llegamos aquí, no lo encontró, aplicamos cooldown de 2 segundos antes de volver a buscar
             _playerSearchCooldown = Time.time + SEARCH_COOLDOWN_DURATION;
             _cachedPlayerRigidbody = null;
             return null;
+        }
+
+        // Returns the LOCAL player GameObject. In singleplayer this is just the single
+        // tagged player; in multiplayer it picks the one this client owns.
+        private GameObject FindLocalPlayer()
+        {
+            GameObject[] players = null;
+            try { players = GameObject.FindGameObjectsWithTag("Player"); }
+            catch { }
+
+            // Fallback: no tagged players (different game version) → scan for PlayerNetworked.
+            if (players == null || players.Length == 0)
+            {
+                var list = new List<GameObject>();
+                try
+                {
+                    var all = UnityEngine.Object.FindObjectsOfType<MonoBehaviour>();
+                    foreach (var mb in all)
+                    {
+                        if (mb != null && mb.GetIl2CppType() != null
+                            && mb.GetIl2CppType().Name == "PlayerNetworked")
+                            list.Add(mb.gameObject);
+                    }
+                }
+                catch { }
+                players = list.ToArray();
+            }
+
+            if (players == null || players.Length == 0)
+                return null;
+
+            // Singleplayer fast path: only one player, it's us.
+            if (players.Length == 1)
+                return players[0];
+
+            // Multiplayer: find the one we own.
+            foreach (var p in players)
+            {
+                if (IsLocalPlayer(p)) return p;
+            }
+
+            // Last-resort fallback: the player closest to the active camera is almost
+            // always the local one (the camera is parented to / follows the local player).
+            if (Camera.main != null)
+            {
+                GameObject best = null;
+                float bestDist = float.MaxValue;
+                var camPos = Camera.main.transform.position;
+                foreach (var p in players)
+                {
+                    if (p == null) continue;
+                    float d = Vector3.Distance(p.transform.position, camPos);
+                    if (d < bestDist) { bestDist = d; best = p; }
+                }
+                if (best != null && bestDist <= 10f) return best;
+            }
+
+            return null;
+        }
+
+        // A player is "local" if it owns the active camera or its network component
+        // reports IsOwner == true.
+        private bool IsLocalPlayer(GameObject p)
+        {
+            if (p == null) return false;
+            try
+            {
+                var cam = p.GetComponentInChildren<Camera>(false);
+                if (cam != null && cam.isActiveAndEnabled) return true;
+
+                var mbs = p.GetComponents<MonoBehaviour>();
+                foreach (var mb in mbs)
+                {
+                    if (mb == null) continue;
+                    var typeObj = mb.GetIl2CppType();
+                    if (typeObj == null) continue;
+
+                    var isOwnerProp = typeObj.GetProperty("IsOwner");
+                    if (isOwnerProp == null) continue;
+
+                    var method = isOwnerProp.GetGetMethod();
+                    if (method == null) continue;
+
+                    var res = method.Invoke(mb, null);
+                    if (res != null && res.Unbox<bool>()) return true;
+                }
+            }
+            catch { }
+            return false;
         }
         
         public GameObject FindCamera()

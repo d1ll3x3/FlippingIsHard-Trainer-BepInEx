@@ -10,6 +10,7 @@ namespace FlippingIsHardTrainer
         private bool _flyModeActive = false;
         private bool _keepVelocityActive = false;
         private bool _keepAngleActive = false;
+        private bool _autoRepairActive = false;
         private bool _showOverlay = true;
 
         // Coordinate caching
@@ -28,13 +29,15 @@ namespace FlippingIsHardTrainer
         private string _strVelOff;
         private string _strAngOn;
         private string _strAngOff;
+        private string _strRepairOn;
+        private string _strRepairOff;
         private string _strMenu;
         private string _strFlyControls = "     WASD / Space / Ctrl  +  Shift=Turbo";
 
         // Base layout constants (scaled at draw time)
         private const float BASE_CTRL_W     = 420f;
-        private const float BASE_CTRL_H     = 236f;
-        private const float BASE_CTRL_H_FLY = 284f;
+        private const float BASE_CTRL_H     = 260f;
+        private const float BASE_CTRL_H_FLY = 308f;
         private const float BASE_COORD_W    = 240f;
         private const float BASE_COORD_H    = 92f;
         private const float BASE_PAD        = 20f;
@@ -48,7 +51,7 @@ namespace FlippingIsHardTrainer
         private readonly Color _headerColor = new Color(0.0f,  0.8f,  1.0f,  1.0f);
         private readonly Color _savedColor  = new Color(0.2f,  1.0f,  0.4f,  1.0f);
         private readonly Color _flyColor    = new Color(0.0f,  1.0f,  1.0f,  1.0f);
-        private readonly Color _dimColor    = new Color(0.7f,  0.7f,  0.7f,  1.0f);
+        private readonly Color _dimColor    = new Color(0.85f, 0.85f, 0.85f, 1.0f);
         private readonly Color _ctrlColor   = new Color(1.0f,  0.7f,  0.4f,  1.0f);
         private readonly Color _dangerColor = new Color(0.8f,  0.3f,  0.3f,  1.0f);
 
@@ -57,7 +60,7 @@ namespace FlippingIsHardTrainer
         private GUIStyle _styleText;
         private bool _stylesReady = false;
 
-        public void UpdateData(Vector3 pos, float speed, bool hasSaved, bool flyActive, bool keepVelocity, bool keepAngle)
+        public void UpdateData(Vector3 pos, float speed, bool hasSaved, bool flyActive, bool keepVelocity, bool keepAngle, bool autoRepair)
         {
             if (_cachedCoords == null || Vector3.Distance(_currentPosition, pos) > 0.05f)
             {
@@ -77,6 +80,7 @@ namespace FlippingIsHardTrainer
             _flyModeActive = flyActive;
             _keepVelocityActive = keepVelocity;
             _keepAngleActive = keepAngle;
+            _autoRepairActive = autoRepair;
             _showOverlay = Application.isFocused;
         }
 
@@ -91,6 +95,7 @@ namespace FlippingIsHardTrainer
             string flyStr = TrainerConfig.Settings.ToggleFlyMode.ToString(device, ps).PadRight(10);
             string velStr = TrainerConfig.Settings.ToggleKeepVelocity.ToString(device, ps).PadRight(10);
             string angStr = TrainerConfig.Settings.ToggleKeepAngle.ToString(device, ps).PadRight(10);
+            string repStr = TrainerConfig.Settings.ToggleAutoRepair.ToString(device, ps).PadRight(10);
             string menuStr = TrainerConfig.Settings.OpenBindMenu.ToString(device, ps).PadRight(10);
 
             _strSave = $"  {saveStr}:  Save position";
@@ -101,6 +106,8 @@ namespace FlippingIsHardTrainer
             _strVelOff = $"  {velStr}:  Keep Velocity [OFF]";
             _strAngOn = $"  {angStr}:  Keep Angle [ON]";
             _strAngOff = $"  {angStr}:  Keep Angle [OFF]";
+            _strRepairOn = $"  {repStr}:  Auto-Repair [ON]";
+            _strRepairOff = $"  {repStr}:  Auto-Repair [OFF]";
             _strMenu = $"  {menuStr}:  Open Bind Menu";
 
             // Fly-mode control hint, switched by active device.
@@ -196,6 +203,10 @@ namespace FlippingIsHardTrainer
 
             _styleText.normal.textColor = _keepAngleActive ? _savedColor : _dimColor;
             GUI.Label(new Rect(cx, cy, lw, lineH), _keepAngleActive ? _strAngOn : _strAngOff, _styleText);
+            cy += lineH;
+
+            _styleText.normal.textColor = _autoRepairActive ? _savedColor : _dimColor;
+            GUI.Label(new Rect(cx, cy, lw, lineH), _autoRepairActive ? _strRepairOn : _strRepairOff, _styleText);
             cy += lineH;
 
             _styleText.normal.textColor = _dimColor;

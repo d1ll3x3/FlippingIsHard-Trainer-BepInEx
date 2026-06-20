@@ -1,6 +1,6 @@
 # Flipping is Hard - Practice Trainer (BepInEx Edition)
 
-A highly optimized Unity IL2CPP BepInEx plugin for "Flipping is Hard Demo" that enables position saving/restoring and a smooth fly mode for speedrun practice. Perfect for mastering difficult sections without restarting.
+A highly optimized Unity IL2CPP BepInEx plugin for "Flipping is Hard Demo" that enables position saving/restoring and a smooth fly mode for speedrun practice. Perfect for mastering difficult sections without restarting. **Works in multiplayer** — it always targets your own (local) player.
 
 ![Trainer Overlay](https://img.shields.io/badge/Status-Working-brightgreen) ![Platform](https://img.shields.io/badge/Platform-Windows-blue) ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -15,6 +15,8 @@ A highly optimized Unity IL2CPP BepInEx plugin for "Flipping is Hard Demo" that 
   - Vertical movement with Space/Ctrl or RT/LT (R2/L2)
   - Speed boost with Shift or B/Circle (3x faster)
   - **Momentum conserved on exit**: velocity carries over when you leave fly mode
+- **🔧 Auto-Repair on Teleport** - Toggle `G` (D-Up): when teleporting back to a saved position, if your phone is broken it is reassembled and your abilities (jump, air control, etc.) are restored. Uses the game's own destruction state machine, so it's a real repair — not just visual.
+- **🌐 Multiplayer Compatible** - Detects and acts only on your local/owned player (via network ownership / active camera). Teleport, fly, save and auto-repair all work in online lobbies; the repair also replicates so other players see your phone reassemble.
 - **⚙️ In-Game Customizable Keybinds** - Press `B` (or `L1+R1` on a gamepad) to open the fully featured Bind Menu!
   - Remap any trainer action directly inside the game, with **keyboard or gamepad** (incl. 2-button gamepad combos).
   - Automatically isolates inputs so you don't accidentally move while editing.
@@ -50,6 +52,7 @@ menu **auto-switch** to show the controls of whichever device you are currently 
 | Toggle Fly Mode              | `F`         | L3        | L3          |
 | Toggle Keep Velocity         | `V`         | D-Left    | D-Left      |
 | Toggle Keep Angle            | `C`         | D-Right   | D-Right     |
+| Toggle Auto-Repair           | `G`         | D-Up      | D-Up        |
 
 All binds are remappable in the **Keybinds Menu**, including **2-button gamepad combos**
 (hold any button and press another). Navigate the menu with the D-Pad/stick,
@@ -70,9 +73,10 @@ Trainer/
 ├── TrainerController.cs         # Core logic and optimization
 ├── TrainerConfig.cs             # Configuration and JSON save/load system
 ├── BindMenuRenderer.cs          # In-game interactive UI for custom keybinds
-├── GameObjectFinder.cs          # Smart and lag-free player finder
-├── InputHandler.cs              # Keyboard hook
+├── GameObjectFinder.cs          # Smart, lag-free local-player finder (multiplayer-aware)
+├── InputHandler.cs              # Keyboard / gamepad input
 ├── OverlayRenderer.cs           # HUD Renderer
+├── PhoneRepair.cs               # Phone auto-repair via the game's destruction FSM
 └── README.md                    # This file
 ```
 
@@ -80,8 +84,9 @@ Trainer/
 If you want to compile the mod yourself:
 1. Clone the repository.
 2. Ensure you have the **.NET 6.0 SDK** installed.
-3. Run the command `dotnet build -c Release` in the project root.
-4. The `.dll` file will be generated in the `bin/Release/net6.0/` folder.
+3. Provide the reference assemblies in a `lib/` folder (not shipped, as they are game/Unity binaries). Copy them from your game's `BepInEx/interop` folder: `Assembly-CSharp.dll`, `Il2CppSystem.dll`, `Il2Cppmscorlib.dll`, `Unity.InputSystem.dll`, and the `UnityEngine.*Module.dll` files referenced in the `.csproj`.
+4. Run the command `dotnet build -c Release` in the project root.
+5. The `.dll` file will be generated in the `bin/Release/net6.0/` folder.
 
 ## 🤝 Contributing
 Found a bug or have an improvement? Feel free to:
@@ -96,4 +101,4 @@ Free for personal, educational, and non-commercial use.
 
 ## 🙏 Credits
 - **Game**: "Flipping is Hard" by Elegant Horse Studios
-- **Disclaimer**: This tool is for educational purposes and single-player practice only. Use responsibly.
+- **Disclaimer**: This tool is for educational purposes and practice. It works in multiplayer but only affects your own player — please use responsibly and respect other players.

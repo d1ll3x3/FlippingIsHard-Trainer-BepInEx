@@ -15,6 +15,7 @@ namespace FlippingIsHardTrainer
         private bool _flyModeActive = false;
         private bool _keepVelocityActive = false;
         private bool _keepAngleActive = false;
+        private bool _autoRepairActive = false;
 
         // Fly mode (trainer-owned, position-based so it works on the game's kinematic body)
         private bool _flyWasKinematic = false;
@@ -244,6 +245,13 @@ namespace FlippingIsHardTrainer
                 _keepAngleActive = !_keepAngleActive;
                 TrainerPlugin.Logger.LogInfo($"Keep Angle {(_keepAngleActive ? "activated" : "deactivated")}");
             }
+
+            // Toggle auto-repair on teleport (G)
+            if (_inputHandler.IsToggleAutoRepairPressed())
+            {
+                _autoRepairActive = !_autoRepairActive;
+                TrainerPlugin.Logger.LogInfo($"Auto-Repair {(_autoRepairActive ? "activated" : "deactivated")}");
+            }
         }
         
         private void SavePosition()
@@ -355,7 +363,20 @@ namespace FlippingIsHardTrainer
                     
                     playerTransform.position = _savedPosition;
                     playerTransform.rotation = _savedRotation;
-                    
+
+                    // Return the phone repaired when the toggle is on. We call the game's
+                    // own reassemble RPC unconditionally — if the phone isn't broken the
+                    // server no-ops. (PhoneContext.IsDestroyed proved unreliable as a gate.)
+                    if (_autoRepairActive)
+                    {
+                        var localPlayer = _gameObjectFinder.FindPlayer();
+                        if (localPlayer != null)
+                        {
+                            PhoneRepair.IsPhoneBroken(localPlayer); // logs IsDestroyed for diagnostics
+                            PhoneRepair.RepairPhone(localPlayer);
+                        }
+                    }
+
                     TrainerPlugin.Logger.LogInfo($"Teleported to saved position: {_savedPosition}");
                 }
                 else
@@ -521,7 +542,8 @@ namespace FlippingIsHardTrainer
                     _hasSavedPosition,
                     _flyModeActive,
                     _keepVelocityActive,
-                    _keepAngleActive
+                    _keepAngleActive,
+                    _autoRepairActive
                 );
             }
             catch (Exception ex)

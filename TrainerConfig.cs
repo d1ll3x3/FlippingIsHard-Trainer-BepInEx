@@ -88,7 +88,7 @@ namespace FlippingIsHardTrainer
 
     public class TrainerSettings
     {
-        public const int CURRENT_VERSION = 3;
+        public const int CURRENT_VERSION = 4;
 
         // No initializer on purpose: an old JSON without this field deserializes to 0,
         // which triggers the migration below.
@@ -105,6 +105,8 @@ namespace FlippingIsHardTrainer
             { GamepadBtn = GamepadButton.DpadLeft };
         public KeyBind ToggleKeepAngle { get; set; } = new KeyBind(KeyCode.C)
             { GamepadBtn = GamepadButton.DpadRight };
+        public KeyBind ToggleAutoRepair { get; set; } = new KeyBind(KeyCode.G)
+            { GamepadBtn = GamepadButton.DpadUp };
         public KeyBind OpenBindMenu { get; set; } = new KeyBind(KeyCode.B)
             { GamepadModifier = GamepadButton.LeftShoulder, GamepadBtn = GamepadButton.RightShoulder };
         public float OverlayScale { get; set; } = 1.0f;

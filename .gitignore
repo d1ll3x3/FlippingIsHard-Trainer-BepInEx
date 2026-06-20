@@ -18,6 +18,9 @@ obj/
 *.exe
 *.pdb
 
+# Release artifacts
+*.zip
+
 # Visual Studio / IDE files
 *.user
 *.suo

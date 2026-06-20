@@ -93,7 +93,7 @@ namespace FlippingIsHardTrainer
         {
             var s = TrainerConfig.Settings;
             return new[] { s.SavePosition, s.Teleport, s.ToggleFlyMode,
-                           s.ToggleKeepVelocity, s.ToggleKeepAngle, s.OpenBindMenu };
+                           s.ToggleKeepVelocity, s.ToggleKeepAngle, s.ToggleAutoRepair, s.OpenBindMenu };
         }
 
         // True if another bind shares this bind's main key but requires a modifier that is
@@ -173,6 +173,7 @@ namespace FlippingIsHardTrainer
         public bool IsToggleFlyModePressed() => CheckBindPressed("Fly", TrainerConfig.Settings.ToggleFlyMode);
         public bool IsToggleKeepVelocityPressed() => CheckBindPressed("Vel", TrainerConfig.Settings.ToggleKeepVelocity);
         public bool IsToggleKeepAnglePressed() => CheckBindPressed("Angle", TrainerConfig.Settings.ToggleKeepAngle);
+        public bool IsToggleAutoRepairPressed() => CheckBindPressed("Repair", TrainerConfig.Settings.ToggleAutoRepair);
         public bool IsOpenBindMenuPressed() => CheckBindPressed("Bind", TrainerConfig.Settings.OpenBindMenu);
 
         // Fly mode movement — keyboard + gamepad left stick / triggers
