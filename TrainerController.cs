@@ -37,6 +37,13 @@ namespace FlippingIsHardTrainer
         // Active-device tracking (auto-switch keyboard <-> gamepad)
         private InputDeviceType _lastDevice = InputDeviceType.Keyboard;
 
+        // Window-focus tracking: ignore trainer hotkeys while unfocused (e.g. Steam overlay
+        // via Shift+Tab) and for a short grace after regaining focus, so a modifier still
+        // "stuck" from the tab combo can't misfire a bind (e.g. Shift+R overwriting the save).
+        private bool _wasFocused = true;
+        private float _inputGraceUntil = 0f;
+        private const float FOCUS_INPUT_GRACE = 0.3f;
+
         // Player freeze while the bind menu is open (stops movement from any input source)
         private bool _wasMenuVisible = false;
         private Vector3 _frozenPosition = Vector3.zero;
@@ -94,8 +101,21 @@ namespace FlippingIsHardTrainer
                 // otherwise trigger the game's native fly).
                 DisableNativeFly();
 
+                // Window focus gate: while the window is unfocused (e.g. Steam overlay opened
+                // with Shift+Tab) we don't process any trainer hotkeys, and we apply a short
+                // grace + edge reset on regaining focus so a modifier still held from the tab
+                // combo can't misfire a bind (Shift+R was overwriting the saved position).
+                bool focused = Application.isFocused;
+                if (focused && !_wasFocused)
+                {
+                    _inputGraceUntil = Time.unscaledTime + FOCUS_INPUT_GRACE;
+                    _inputHandler.ResetEdges();
+                }
+                _wasFocused = focused;
+                bool acceptInput = focused && Time.unscaledTime >= _inputGraceUntil;
+
                 // Open / close bind menu
-                if (_inputHandler.IsOpenBindMenuPressed())
+                if (acceptInput && _inputHandler.IsOpenBindMenuPressed())
                 {
                     _bindMenuRenderer.ToggleVisibility();
                 }
@@ -103,8 +123,8 @@ namespace FlippingIsHardTrainer
                 // Freeze the player while the menu is open so no input source can move it
                 HandleMenuFreeze();
 
-                // Handle trainer hotkeys only if menu is not visible
-                if (!_bindMenuRenderer.IsVisible)
+                // Handle trainer hotkeys only if menu is not visible and input is accepted
+                if (acceptInput && !_bindMenuRenderer.IsVisible)
                 {
                     HandleHotkeys();
 

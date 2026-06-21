@@ -72,6 +72,10 @@ namespace FlippingIsHardTrainer
 
         public void Update() { }
 
+        // Clear edge-detection state so the first frame after regaining window focus
+        // doesn't register a stale "just pressed" (e.g. Shift held during Shift+Tab).
+        public void ResetEdges() => _wasPressed.Clear();
+
         private bool IsModifierHeld(KeyCode modifier)
         {
             if (modifier == KeyCode.None) return false;
