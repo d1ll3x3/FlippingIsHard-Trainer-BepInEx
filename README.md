@@ -95,13 +95,10 @@ Found a bug or have an improvement? Feel free to:
 3. Submit a pull request
 
 ## 📄 License
-MIT License - See [LICENSE](LICENSE) file for details.
 
-Free for personal, educational, and non-commercial use.
 
 ## 🙏 Credits
 - **Game**: "Flipping is Hard" by Elegant Horse Studios
-- **Disclaimer**: This tool is for educational purposes and practice. It works in multiplayer but only affects your own player — please use responsibly and respect other players.
 ## License
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
