@@ -2,7 +2,7 @@
 
 A highly optimized Unity IL2CPP BepInEx plugin for "Flipping is Hard Demo" that enables position saving/restoring and a smooth fly mode for speedrun practice. Perfect for mastering difficult sections without restarting. **Works in multiplayer** — it always targets your own (local) player.
 
-![Trainer Overlay](https://img.shields.io/badge/Status-Working-brightgreen) ![Platform](https://img.shields.io/badge/Platform-Windows-blue) ![License](https://img.shields.io/badge/License-MIT-green)
+![Trainer Overlay](https://img.shields.io/badge/Status-Working-brightgreen) ![Platform](https://img.shields.io/badge/Platform-Windows-blue)
 
 ## ✨ Features
 - **📌 Advanced Position Save/Restore** - Save any position with `Shift+R`, teleport back with `R`
@@ -93,9 +93,6 @@ Found a bug or have an improvement? Feel free to:
 1. Fork the repository
 2. Create a feature branch
 3. Submit a pull request
-
-## 📄 License
-
 
 ## 🙏 Credits
 - **Game**: "Flipping is Hard" by Elegant Horse Studios
