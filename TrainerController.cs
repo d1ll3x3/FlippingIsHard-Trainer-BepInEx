@@ -130,6 +130,11 @@ namespace FlippingIsHardTrainer
 
                     if (_flyModeActive)
                         HandleFlyMode();
+
+                    // Help beam in singleplayer (right-click, driven by us since the game
+                    // blocks its own input path outside multiplayer)
+                    if (TrainerConfig.Settings.HelpBeamSingleplayer)
+                        HelpBeamUnlock.Update(_gameObjectFinder.FindPlayer());
                 }
                 
                 // Reducimos la frecuencia de actualización de UI a 1 vez cada varios frames para evitar lag
@@ -271,6 +276,15 @@ namespace FlippingIsHardTrainer
             {
                 _autoRepairActive = !_autoRepairActive;
                 TrainerPlugin.Logger.LogInfo($"Auto-Repair {(_autoRepairActive ? "activated" : "deactivated")}");
+            }
+
+            // Toggle help beam in singleplayer (N)
+            if (_inputHandler.IsToggleHelpBeamPressed())
+            {
+                TrainerConfig.Settings.HelpBeamSingleplayer = !TrainerConfig.Settings.HelpBeamSingleplayer;
+                if (!TrainerConfig.Settings.HelpBeamSingleplayer)
+                    HelpBeamUnlock.Deactivate();
+                TrainerPlugin.Logger.LogInfo($"Help Beam SP {(TrainerConfig.Settings.HelpBeamSingleplayer ? "activated" : "deactivated")}");
             }
         }
         
@@ -563,7 +577,8 @@ namespace FlippingIsHardTrainer
                     _flyModeActive,
                     _keepVelocityActive,
                     _keepAngleActive,
-                    _autoRepairActive
+                    _autoRepairActive,
+                    TrainerConfig.Settings.HelpBeamSingleplayer
                 );
             }
             catch (Exception ex)

@@ -32,7 +32,7 @@ namespace FlippingIsHardTrainer
         private bool _wasNavDown  = false;
         private bool _wasNavLeft  = false;
         private bool _wasNavRight = false;
-        private const int NAV_ITEM_COUNT = 11; // 7 bind rows + HUD Scale + Reset + Cancel + Save
+        private const int NAV_ITEM_COUNT = 12; // 8 bind rows + HUD Scale + Reset + Cancel + Save
         private int _lastGpFrame = -1;
         private GamepadButton? _pendingGpModifier = null; // shoulder/trigger held while capturing a combo
 
@@ -258,7 +258,7 @@ namespace FlippingIsHardTrainer
             _wasNavDown = navDown;
 
             // Left/Right adjusts HUD Scale when that row is selected
-            if (_selectedIndex == 7)
+            if (_selectedIndex == 8)
             {
                 if (navLeft  && !_wasNavLeft)  AdjustTempScale(-0.05f);
                 if (navRight && !_wasNavRight) AdjustTempScale(+0.05f);
@@ -294,6 +294,7 @@ namespace FlippingIsHardTrainer
                 "Vel" => _tempSettings.ToggleKeepVelocity,
                 "Angle" => _tempSettings.ToggleKeepAngle,
                 "Repair" => _tempSettings.ToggleAutoRepair,
+                "Beam" => _tempSettings.ToggleHelpBeam,
                 "Menu" => _tempSettings.OpenBindMenu,
                 _ => null
             };
@@ -317,25 +318,25 @@ namespace FlippingIsHardTrainer
 
         private void HandleGamepadActivate(int index)
         {
-            string[] bindActions = { "Save", "Teleport", "Fly", "Vel", "Angle", "Repair", "Menu" };
-            if (index < 7)
+            string[] bindActions = { "Save", "Teleport", "Fly", "Vel", "Angle", "Repair", "Beam", "Menu" };
+            if (index < 8)
             {
                 _listeningAction = bindActions[index];
                 _pendingGpModifier = null;
             }
-            else if (index == 7) // HUD Scale — A increments (use ◄ ► to dec/inc)
+            else if (index == 8) // HUD Scale — A increments (use ◄ ► to dec/inc)
             {
                 AdjustTempScale(+0.05f);
             }
-            else if (index == 8) // Reset Defaults
+            else if (index == 9) // Reset Defaults
             {
                 ResetTempToDefaults();
             }
-            else if (index == 9) // Cancel
+            else if (index == 10) // Cancel
             {
                 CloseMenu();
             }
-            else if (index == 10) // Save
+            else if (index == 11) // Save
             {
                 SaveTempSettings();
             }
@@ -367,8 +368,11 @@ namespace FlippingIsHardTrainer
                 ToggleKeepVelocity = src.ToggleKeepVelocity.Clone(),
                 ToggleKeepAngle    = src.ToggleKeepAngle.Clone(),
                 ToggleAutoRepair   = src.ToggleAutoRepair.Clone(),
+                ToggleHelpBeam     = src.ToggleHelpBeam.Clone(),
                 OpenBindMenu       = src.OpenBindMenu.Clone(),
                 OverlayScale       = src.OverlayScale,
+                HelpBeamSingleplayer = src.HelpBeamSingleplayer,
+                HelpBeamSpawnLevel = src.HelpBeamSpawnLevel,
             };
         }
 
@@ -397,11 +401,12 @@ namespace FlippingIsHardTrainer
             DrawBindRow(20, ref cy, "Toggle Keep Velocity","Vel",      _tempSettings.ToggleKeepVelocity, 3);
             DrawBindRow(20, ref cy, "Toggle Keep Angle",   "Angle",    _tempSettings.ToggleKeepAngle,    4);
             DrawBindRow(20, ref cy, "Toggle Auto-Repair",  "Repair",   _tempSettings.ToggleAutoRepair,   5);
-            DrawBindRow(20, ref cy, "Open Bind Menu",      "Menu",     _tempSettings.OpenBindMenu,       6);
+            DrawBindRow(20, ref cy, "Toggle Help Beam SP", "Beam",     _tempSettings.ToggleHelpBeam,     6);
+            DrawBindRow(20, ref cy, "Open Bind Menu",      "Menu",     _tempSettings.OpenBindMenu,       7);
 
             // ── HUD Scale row ────────────────────────────────────────────
             cy += 4;
-            GUI.color = _selectedIndex == 7 ? Color.yellow : Color.white;
+            GUI.color = _selectedIndex == 8 ? Color.yellow : Color.white;
             GUI.Label(new Rect(20, cy, 175, 24), "HUD Scale");
             GUI.color = Color.white;
             GUI.backgroundColor = new Color(0.4f, 0.4f, 0.4f, 1f);
@@ -422,7 +427,7 @@ namespace FlippingIsHardTrainer
                 bool ps = InputDeviceTracker.IsDualShock;
                 string sel = ps ? "Cross" : "A";
                 string close = ps ? "Circle" : "B";
-                string hint = _selectedIndex == 7
+                string hint = _selectedIndex == 8
                     ? $"Mando: ◄ ► ajustar escala  |  {close} cancelar/cerrar"
                     : $"Mando: D-Pad navegar  |  {sel} seleccionar  |  {close} cancelar/cerrar";
                 GUI.color = new Color(0.7f, 0.9f, 1f);
@@ -432,17 +437,17 @@ namespace FlippingIsHardTrainer
 
             cy = _windowRect.height - 50;
 
-            GUI.color = _selectedIndex == 8 ? Color.yellow : Color.white;
+            GUI.color = _selectedIndex == 9 ? Color.yellow : Color.white;
             if (CustomButton(new Rect(20, cy, 140, 30), "Reset Defaults"))
             {
                 ResetTempToDefaults();
             }
-            GUI.color = _selectedIndex == 9 ? Color.yellow : Color.white;
+            GUI.color = _selectedIndex == 10 ? Color.yellow : Color.white;
             if (CustomButton(new Rect(180, cy, 140, 30), "Cancel"))
             {
                 CloseMenu();
             }
-            GUI.color = _selectedIndex == 10 ? Color.yellow : Color.white;
+            GUI.color = _selectedIndex == 11 ? Color.yellow : Color.white;
             if (CustomButton(new Rect(340, cy, 140, 30), "SAVE"))
             {
                 SaveTempSettings();

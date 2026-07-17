@@ -16,6 +16,7 @@ A highly optimized Unity IL2CPP BepInEx plugin for "Flipping is Hard Demo" that 
   - Speed boost with Shift or B/Circle (3x faster)
   - **Momentum conserved on exit**: velocity carries over when you leave fly mode
 - **🔧 Auto-Repair on Teleport** - Toggle `G` (D-Up): when teleporting back to a saved position, if your phone is broken it is reassembled and your abilities (jump, air control, etc.) are restored. Uses the game's own destruction state machine, so it's a real repair — not just visual.
+- **🔦 Help Beam in Singleplayer** - The game's multiplayer-only help beam works in solo play too, with the exact base-game rules: **hold Right-Click** to keep the beam up (release = it disappears), it can only be summoned **while touching something** (ground or wall), and **moving away from the beam breaks your phone**, just like in multiplayer. Toggle the feature with `N` (D-Down). Perfect for practicing the mechanic before going online (inactive in real multiplayer lobbies, where the native beam takes over).
 - **🌐 Multiplayer Compatible** - Detects and acts only on your local/owned player (via network ownership / active camera). Teleport, fly, save and auto-repair all work in online lobbies; the repair also replicates so other players see your phone reassemble.
 - **⚙️ In-Game Customizable Keybinds** - Press `B` (or `L1+R1` on a gamepad) to open the fully featured Bind Menu!
   - Remap any trainer action directly inside the game, with **keyboard or gamepad** (incl. 2-button gamepad combos).
@@ -53,6 +54,7 @@ menu **auto-switch** to show the controls of whichever device you are currently 
 | Toggle Keep Velocity         | `V`         | D-Left    | D-Left      |
 | Toggle Keep Angle            | `C`         | D-Right   | D-Right     |
 | Toggle Auto-Repair           | `G`         | D-Up      | D-Up        |
+| Toggle Help Beam SP          | `N`         | D-Down    | D-Down      |
 
 All binds are remappable in the **Keybinds Menu**, including **2-button gamepad combos**
 (hold any button and press another). Navigate the menu with the D-Pad/stick,

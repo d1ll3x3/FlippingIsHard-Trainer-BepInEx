@@ -11,6 +11,7 @@ namespace FlippingIsHardTrainer
         private bool _keepVelocityActive = false;
         private bool _keepAngleActive = false;
         private bool _autoRepairActive = false;
+        private bool _helpBeamSpActive = false;
         private bool _showOverlay = true;
 
         // Coordinate caching
@@ -31,13 +32,15 @@ namespace FlippingIsHardTrainer
         private string _strAngOff;
         private string _strRepairOn;
         private string _strRepairOff;
+        private string _strBeamOn;
+        private string _strBeamOff;
         private string _strMenu;
         private string _strFlyControls = "     WASD / Space / Ctrl  +  Shift=Turbo";
 
         // Base layout constants (scaled at draw time)
         private const float BASE_CTRL_W     = 420f;
-        private const float BASE_CTRL_H     = 260f;
-        private const float BASE_CTRL_H_FLY = 308f;
+        private const float BASE_CTRL_H     = 284f;
+        private const float BASE_CTRL_H_FLY = 332f;
         private const float BASE_COORD_W    = 240f;
         private const float BASE_COORD_H    = 92f;
         private const float BASE_PAD        = 20f;
@@ -60,7 +63,7 @@ namespace FlippingIsHardTrainer
         private GUIStyle _styleText;
         private bool _stylesReady = false;
 
-        public void UpdateData(Vector3 pos, float speed, bool hasSaved, bool flyActive, bool keepVelocity, bool keepAngle, bool autoRepair)
+        public void UpdateData(Vector3 pos, float speed, bool hasSaved, bool flyActive, bool keepVelocity, bool keepAngle, bool autoRepair, bool helpBeamSp)
         {
             if (_cachedCoords == null || Vector3.Distance(_currentPosition, pos) > 0.05f)
             {
@@ -81,6 +84,7 @@ namespace FlippingIsHardTrainer
             _keepVelocityActive = keepVelocity;
             _keepAngleActive = keepAngle;
             _autoRepairActive = autoRepair;
+            _helpBeamSpActive = helpBeamSp;
             _showOverlay = Application.isFocused;
         }
 
@@ -108,6 +112,10 @@ namespace FlippingIsHardTrainer
             _strAngOff = $"  {angStr}:  Keep Angle [OFF]";
             _strRepairOn = $"  {repStr}:  Auto-Repair [ON]";
             _strRepairOff = $"  {repStr}:  Auto-Repair [OFF]";
+            // Toggle bind shown; the beam itself is used with the game's right-click.
+            string beamStr = TrainerConfig.Settings.ToggleHelpBeam.ToString(device, ps).PadRight(10);
+            _strBeamOn = $"  {beamStr}:  Help Beam SP [ON]";
+            _strBeamOff = $"  {beamStr}:  Help Beam SP [OFF]";
             _strMenu = $"  {menuStr}:  Open Bind Menu";
 
             // Fly-mode control hint, switched by active device.
@@ -207,6 +215,10 @@ namespace FlippingIsHardTrainer
 
             _styleText.normal.textColor = _autoRepairActive ? _savedColor : _dimColor;
             GUI.Label(new Rect(cx, cy, lw, lineH), _autoRepairActive ? _strRepairOn : _strRepairOff, _styleText);
+            cy += lineH;
+
+            _styleText.normal.textColor = _helpBeamSpActive ? _savedColor : _dimColor;
+            GUI.Label(new Rect(cx, cy, lw, lineH), _helpBeamSpActive ? _strBeamOn : _strBeamOff, _styleText);
             cy += lineH;
 
             _styleText.normal.textColor = _dimColor;

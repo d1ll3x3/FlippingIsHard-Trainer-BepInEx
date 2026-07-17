@@ -107,9 +107,16 @@ namespace FlippingIsHardTrainer
             { GamepadBtn = GamepadButton.DpadRight };
         public KeyBind ToggleAutoRepair { get; set; } = new KeyBind(KeyCode.G)
             { GamepadBtn = GamepadButton.DpadUp };
+        public KeyBind ToggleHelpBeam { get; set; } = new KeyBind(KeyCode.N)
+            { GamepadBtn = GamepadButton.DpadDown };
         public KeyBind OpenBindMenu { get; set; } = new KeyBind(KeyCode.B)
             { GamepadModifier = GamepadButton.LeftShoulder, GamepadBtn = GamepadButton.RightShoulder };
         public float OverlayScale { get; set; } = 1.0f;
+        // Enable the game's multiplayer-only help beam (right-click) in singleplayer.
+        // Missing in old configs -> initializer keeps it ON, so no version bump needed.
+        public bool HelpBeamSingleplayer { get; set; } = true;
+        // First spawn path that proved to work (see HelpBeamUnlock levels); -1 = not yet known.
+        public int HelpBeamSpawnLevel { get; set; } = -1;
     }
 
     public static class TrainerConfig
