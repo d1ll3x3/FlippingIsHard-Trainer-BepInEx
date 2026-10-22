@@ -76,17 +76,18 @@ namespace FlippingIsHardTrainer
         // doesn't register a stale "just pressed" (e.g. Shift held during Shift+Tab).
         public void ResetEdges() => _wasPressed.Clear();
 
-        private bool IsModifierHeld(KeyCode modifier)
+        // Left/right variants of Shift, Ctrl and Alt count as the same key.
+        private bool IsKeyHeld(KeyCode key)
         {
-            if (modifier == KeyCode.None) return false;
-            if (modifier == KeyCode.LeftShift || modifier == KeyCode.RightShift)
+            if (key == KeyCode.None) return false;
+            if (key == KeyCode.LeftShift || key == KeyCode.RightShift)
                 return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-            if (modifier == KeyCode.LeftControl || modifier == KeyCode.RightControl)
+            if (key == KeyCode.LeftControl || key == KeyCode.RightControl)
                 return Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (modifier == KeyCode.LeftAlt || modifier == KeyCode.RightAlt)
+            if (key == KeyCode.LeftAlt || key == KeyCode.RightAlt)
                 return Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
 
-            return Input.GetKey(modifier);
+            return Input.GetKey(key);
         }
 
         // All trainer binds, so a no-modifier bind can check for a real competing combo
@@ -109,7 +110,7 @@ namespace FlippingIsHardTrainer
             {
                 if (other == bind) continue;
                 if (other.MainKey == bind.MainKey && other.Modifier != KeyCode.None
-                    && IsModifierHeld(other.Modifier))
+                    && IsKeyHeld(other.Modifier))
                     return true;
             }
             return false;
@@ -133,7 +134,7 @@ namespace FlippingIsHardTrainer
             if (!bind.HasKeyboard) return false;
 
             bool isMainHeld = Input.GetKey(bind.MainKey);
-            bool isModHeld = IsModifierHeld(bind.Modifier);
+            bool isModHeld = IsKeyHeld(bind.Modifier);
 
             // Si el bind exige modificador, tiene que estar pulsado. Si no exige modificador,
             // solo se suprime cuando hay un combo real en conflicto (misma tecla + su
@@ -182,25 +183,30 @@ namespace FlippingIsHardTrainer
         public bool IsToggleHelpBeamPressed() => CheckBindPressed("Beam", TrainerConfig.Settings.ToggleHelpBeam);
         public bool IsOpenBindMenuPressed() => CheckBindPressed("Bind", TrainerConfig.Settings.OpenBindMenu);
 
-        // Fly mode movement — keyboard + gamepad left stick / triggers
-        public bool IsWPressed() => Input.GetKey(KeyCode.W) || GetLeftStickY() > STICK_DEADZONE;
-        public bool IsSPressed() => Input.GetKey(KeyCode.S) || GetLeftStickY() < -STICK_DEADZONE;
-        public bool IsAPressed() => Input.GetKey(KeyCode.A) || GetLeftStickX() < -STICK_DEADZONE;
-        public bool IsDPressed() => Input.GetKey(KeyCode.D) || GetLeftStickX() > STICK_DEADZONE;
-        public bool IsSpacePressed() => Input.GetKey(KeyCode.Space) || GetRightTrigger() > STICK_DEADZONE;
-        public bool IsCtrlPressed() => Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl) || GetLeftTrigger() > STICK_DEADZONE;
-        // Fly turbo: Shift (keyboard) or B / Circle (gamepad)
-        public bool IsShiftPressed() => Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) || (Gamepad.current?[GamepadButton.East].isPressed == true);
+        // Fly mode movement — held binds from either device (no active-device gate, so you
+        // can mix stick + keyboard), plus the gamepad left stick for analog directions.
+        public bool IsFlyForwardHeld() => IsBindHeld(TrainerConfig.Settings.FlyForward) || GetLeftStickY() > STICK_DEADZONE;
+        public bool IsFlyBackwardHeld() => IsBindHeld(TrainerConfig.Settings.FlyBackward) || GetLeftStickY() < -STICK_DEADZONE;
+        public bool IsFlyLeftHeld() => IsBindHeld(TrainerConfig.Settings.FlyLeft) || GetLeftStickX() < -STICK_DEADZONE;
+        public bool IsFlyRightHeld() => IsBindHeld(TrainerConfig.Settings.FlyRight) || GetLeftStickX() > STICK_DEADZONE;
+        public bool IsFlyUpHeld() => IsBindHeld(TrainerConfig.Settings.FlyUp);
+        public bool IsFlyDownHeld() => IsBindHeld(TrainerConfig.Settings.FlyDown);
+        public bool IsFlyTurboHeld() => IsBindHeld(TrainerConfig.Settings.FlyTurbo);
+
+        private bool IsBindHeld(KeyBind bind)
+        {
+            if (bind == null) return false;
+
+            bool kb = bind.HasKeyboard && IsKeyHeld(bind.MainKey)
+                      && (bind.Modifier == KeyCode.None || IsKeyHeld(bind.Modifier));
+            if (kb) return true;
+
+            var gp = Gamepad.current;
+            return gp != null && bind.HasGamepad && gp[bind.GamepadBtn.Value].isPressed
+                   && (!bind.GamepadModifier.HasValue || gp[bind.GamepadModifier.Value].isPressed);
+        }
 
         private float GetLeftStickX() => Gamepad.current?.leftStick.x.ReadValue() ?? 0f;
         private float GetLeftStickY() => Gamepad.current?.leftStick.y.ReadValue() ?? 0f;
-        private float GetRightTrigger() => Gamepad.current?.rightTrigger.ReadValue() ?? 0f;
-        private float GetLeftTrigger() => Gamepad.current?.leftTrigger.ReadValue() ?? 0f;
-
-        public bool IsAnyMovementKeyPressed()
-        {
-            return IsWPressed() || IsSPressed() || IsAPressed() || IsDPressed() ||
-                   IsSpacePressed() || IsCtrlPressed();
-        }
     }
 }

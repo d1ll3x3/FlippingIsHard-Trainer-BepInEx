@@ -1,13 +1,14 @@
 using BepInEx;
 using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
+using HarmonyLib;
 using Il2CppInterop.Runtime.Injection;
 using UnityEngine;
 using System;
 
 namespace FlippingIsHardTrainer
 {
-    [BepInPlugin("com.flippingishard.trainer", "Flipping is Hard Trainer", "1.5.0")]
+    [BepInPlugin("com.flippingishard.trainer", "Flipping is Hard Trainer", "1.6.0")]
     public class TrainerPlugin : BasePlugin
     {
         internal static ManualLogSource Logger { get; private set; }
@@ -17,6 +18,17 @@ namespace FlippingIsHardTrainer
             Logger = Log;
             Logger.LogInfo("Flipping is Hard Trainer plugin loaded!");
             Logger.LogInfo("Controls: Shift+R (Save), R (Teleport), F (Fly Mode)");
+
+            try
+            {
+                new Harmony("com.flippingishard.trainer").PatchAll(typeof(HelpBeamUnlock));
+                Logger.LogInfo("Help beam singleplayer patch applied");
+            }
+            catch (Exception ex)
+            {
+                // The rest of the trainer still works without the beam patch.
+                Logger.LogError($"Error applying help beam patch: {ex}");
+            }
 
             try
             {

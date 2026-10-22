@@ -8,23 +8,89 @@ namespace FlippingIsHardTrainer
 {
     public class BindMenuRenderer
     {
+        // One remappable action. Held = movement-style bind (fly directions / turbo): captured
+        // as a single key or button, and Shift/Ctrl/Alt are valid keys on their own.
+        private sealed class BindAction
+        {
+            public readonly string Label;
+            public readonly bool Held;
+            public readonly Func<TrainerSettings, KeyBind> Get;
+
+            public BindAction(string label, bool held, Func<TrainerSettings, KeyBind> get)
+            {
+                Label = label;
+                Held = held;
+                Get = get;
+            }
+        }
+
+        private static readonly BindAction[] Actions =
+        {
+            new BindAction("Save position",    false, s => s.SavePosition),
+            new BindAction("Teleport",         false, s => s.Teleport),
+            new BindAction("Keep velocity",    false, s => s.ToggleKeepVelocity),
+            new BindAction("Keep angle",       false, s => s.ToggleKeepAngle),
+            new BindAction("Auto-repair",      false, s => s.ToggleAutoRepair),
+            new BindAction("Help beam (solo)", false, s => s.ToggleHelpBeam),
+            new BindAction("Open this menu",   false, s => s.OpenBindMenu),
+            new BindAction("Toggle fly mode",  false, s => s.ToggleFlyMode),
+            new BindAction("Forward",          true,  s => s.FlyForward),
+            new BindAction("Backward",         true,  s => s.FlyBackward),
+            new BindAction("Left",             true,  s => s.FlyLeft),
+            new BindAction("Right",            true,  s => s.FlyRight),
+            new BindAction("Up",               true,  s => s.FlyUp),
+            new BindAction("Down",             true,  s => s.FlyDown),
+            new BindAction("Turbo (hold)",     true,  s => s.FlyTurbo),
+        };
+        private const int FLY_SECTION_START = 7;
+
+        // Gamepad navigation items: one per bind row, then HUD Scale, Reset, Cancel, Save.
+        private static readonly int NAV_SCALE  = Actions.Length;
+        private static readonly int NAV_RESET  = Actions.Length + 1;
+        private static readonly int NAV_CANCEL = Actions.Length + 2;
+        private static readonly int NAV_SAVE   = Actions.Length + 3;
+        private static readonly int NAV_ITEM_COUNT = Actions.Length + 4;
+
+        // Layout, in unscaled units (the whole menu is scaled to the screen via GUI.matrix)
+        private const float W          = 640f;
+        private const float PAD        = 22f;
+        private const float HEADER_H   = 66f;
+        private const float COLS_H     = 26f;
+        private const float SECTION_H  = 30f;
+        private const float ROW_H      = 32f;
+        private const float CELL_W     = 170f;
+        private const float CELL_H     = 24f;
+        private const float SCALE_H    = 42f;
+        private const float HINT_H     = 24f;
+        private const float BUTTON_H   = 36f;
+        private static readonly float H =
+            HEADER_H + COLS_H + SECTION_H * 2f + ROW_H * Actions.Length + 12f + SCALE_H + HINT_H + BUTTON_H + PAD;
+
         private GameObjectFinder _gameObjectFinder;
         private List<MonoBehaviour> _disabledScripts = new List<MonoBehaviour>();
 
         private bool _isVisible = false;
-        private Rect _windowRect = new Rect(Screen.width / 2 - 250, Screen.height / 2 - 220, 500, 440);
+        private Vector2 _panelPos;
+        private bool _needsCentering = true;
+        private float _uiScale = 1f;
+        private bool _dragging = false;
+        private Vector2 _dragOffset;
 
-        private GUIStyle _titleStyle;
+        private GUIStyle _styleTitle;
+        private GUIStyle _styleSubtitle;
+        private GUIStyle _styleCaption;
+        private GUIStyle _styleCaptionCenter;
+        private GUIStyle _styleLabel;
+        private GUIStyle _styleChip;
+        private GUIStyle _styleButton;
         private bool _stylesReady = false;
 
-        private Color _defaultBgColor;
-
         private TrainerSettings _tempSettings;
-        
-        // Listening state
-        private string _listeningAction = null;
+
+        // Listening state (-1 = not capturing)
+        private int _listeningIndex = -1;
+        private InputDeviceType _listeningDevice = InputDeviceType.Keyboard;
         private bool _clickHandledThisFrame = false;
-        private GUI.WindowFunction _windowDelegate;
 
         // Gamepad navigation state
         private int _selectedIndex = 0;
@@ -32,7 +98,6 @@ namespace FlippingIsHardTrainer
         private bool _wasNavDown  = false;
         private bool _wasNavLeft  = false;
         private bool _wasNavRight = false;
-        private const int NAV_ITEM_COUNT = 12; // 8 bind rows + HUD Scale + Reset + Cancel + Save
         private int _lastGpFrame = -1;
         private GamepadButton? _pendingGpModifier = null; // shoulder/trigger held while capturing a combo
 
@@ -54,14 +119,21 @@ namespace FlippingIsHardTrainer
             GamepadButton.DpadUp, GamepadButton.DpadDown, GamepadButton.DpadLeft, GamepadButton.DpadRight
         };
 
+        // Modifier keys may not reach IMGUI as KeyDown events, so held binds poll for them.
+        private static readonly KeyCode[] ModifierKeys =
+        {
+            KeyCode.LeftShift, KeyCode.RightShift, KeyCode.LeftControl,
+            KeyCode.RightControl, KeyCode.LeftAlt, KeyCode.RightAlt
+        };
+
         public static bool IsVisibleGlobally = false;
         public bool IsVisible => _isVisible;
+        public bool IsListening => _listeningIndex >= 0;
         public Action OnMenuClosed;
 
         public BindMenuRenderer(GameObjectFinder gameObjectFinder)
         {
             _gameObjectFinder = gameObjectFinder;
-            _windowDelegate = new Action<int>(WindowFunction);
         }
 
         public void ToggleVisibility()
@@ -74,7 +146,7 @@ namespace FlippingIsHardTrainer
             {
                 _isVisible = true;
                 IsVisibleGlobally = true;
-                
+
                 // Disable player and camera scripts to prevent game interaction
                 DisableGameScripts();
 
@@ -85,10 +157,11 @@ namespace FlippingIsHardTrainer
                     if (UnityEngine.InputSystem.Mouse.current != null)
                         UnityEngine.InputSystem.InputSystem.DisableDevice(UnityEngine.InputSystem.Mouse.current);
                 } catch { }
-                
+
                 // Clone settings for editing (keeps Version so SAVE doesn't reset config)
                 _tempSettings = CloneSettings(TrainerConfig.Settings);
-                _listeningAction = null;
+                FinishListening();
+                _needsCentering = true;
             }
         }
 
@@ -96,13 +169,13 @@ namespace FlippingIsHardTrainer
         {
             if (_stylesReady) return;
 
-            _titleStyle = new GUIStyle();
-            _titleStyle.normal.textColor = new Color(0.5f, 0.8f, 1f);
-            _titleStyle.fontSize = 20;
-            _titleStyle.fontStyle = FontStyle.Bold;
-            _titleStyle.alignment = TextAnchor.MiddleCenter;
-
-            _defaultBgColor = GUI.backgroundColor;
+            _styleTitle         = TrainerTheme.MakeLabel(20, FontStyle.Bold);
+            _styleSubtitle      = TrainerTheme.MakeLabel(12);
+            _styleCaption       = TrainerTheme.MakeLabel(11, FontStyle.Bold);
+            _styleCaptionCenter = TrainerTheme.MakeLabel(11, FontStyle.Bold, TextAnchor.MiddleCenter);
+            _styleLabel         = TrainerTheme.MakeLabel(14);
+            _styleChip          = TrainerTheme.MakeLabel(12, FontStyle.Bold, TextAnchor.MiddleCenter);
+            _styleButton        = TrainerTheme.MakeLabel(13, FontStyle.Bold, TextAnchor.MiddleCenter);
             _stylesReady = true;
         }
 
@@ -132,64 +205,103 @@ namespace FlippingIsHardTrainer
                 HandleGamepadInput(gp);
             }
 
-            // Handle keyboard / mouse listening input
-            if (_listeningAction != null)
+            if (_listeningIndex >= 0)
+                HandleKeyboardListening();
+
+            // Scale with the resolution (designed at 1080p) and always fit on screen.
+            _uiScale = Mathf.Min(Mathf.Clamp(Screen.height / 1080f, 0.75f, 2f),
+                                 Screen.height * 0.94f / H, Screen.width * 0.96f / W);
+            Matrix4x4 oldMatrix = GUI.matrix;
+            GUI.matrix = Matrix4x4.Scale(new Vector3(_uiScale, _uiScale, 1f));
+
+            float viewW = Screen.width / _uiScale;
+            float viewH = Screen.height / _uiScale;
+            if (_needsCentering)
             {
-                Event e = Event.current;
+                _panelPos = new Vector2((viewW - W) * 0.5f, (viewH - H) * 0.5f);
+                _needsCentering = false;
+            }
 
-                // Use raw Input for escape to guarantee it works even if events are swallowed
-                if (Input.GetKeyDown(KeyCode.Escape))
+            TrainerTheme.FillRect(new Rect(0f, 0f, viewW, viewH), TrainerTheme.Backdrop);
+            if (Event.current.type == EventType.Repaint)
+                HandleDrag(viewW, viewH);
+            DrawPanel();
+
+            GUI.matrix = oldMatrix;
+        }
+
+        // ── Input ───────────────────────────────────────────────────────────
+
+        private void HandleKeyboardListening()
+        {
+            Event e = Event.current;
+
+            // Use raw Input for escape to guarantee it works even if events are swallowed
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                FinishListening();
+                if (e.type != EventType.Repaint && e.type != EventType.Layout) e.Use();
+                return;
+            }
+            if (_listeningDevice != InputDeviceType.Keyboard) return;
+
+            bool held = Actions[_listeningIndex].Held;
+            if (held)
+            {
+                foreach (var mk in ModifierKeys)
                 {
-                    _listeningAction = null;
-                    if (e.type != EventType.Repaint && e.type != EventType.Layout) e.Use();
-                }
-                else if (e.type == EventType.KeyDown || e.type == EventType.MouseDown)
-                {
-                    KeyCode key = KeyCode.None;
-                    if (e.type == EventType.KeyDown)
+                    if (Input.GetKeyDown(mk))
                     {
-                        key = e.keyCode;
-                    }
-                    else if (e.type == EventType.MouseDown)
-                    {
-                        if (e.button == 0) key = KeyCode.Mouse0;
-                        else if (e.button == 1) key = KeyCode.Mouse1;
-                        else if (e.button == 2) key = KeyCode.Mouse2;
-                        else if (e.button == 3) key = KeyCode.Mouse3;
-                        else if (e.button == 4) key = KeyCode.Mouse4;
-                        else if (e.button == 5) key = KeyCode.Mouse5;
-                        else if (e.button == 6) key = KeyCode.Mouse6;
-                    }
-
-                    // Ignore None and Main Mouse buttons (Left/Right click)
-                    if (key != KeyCode.None && key != KeyCode.Mouse0 && key != KeyCode.Mouse1 && key != KeyCode.Escape)
-                    {
-                        // Ignore pure modifier keys as main key (we catch them as modifiers)
-                        if (key != KeyCode.LeftShift && key != KeyCode.RightShift &&
-                            key != KeyCode.LeftControl && key != KeyCode.RightControl &&
-                            key != KeyCode.LeftAlt && key != KeyCode.RightAlt)
-                        {
-                            KeyCode mod = KeyCode.None;
-                            if (e.shift || Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) mod = KeyCode.LeftShift;
-                            else if (e.control || Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) mod = KeyCode.LeftControl;
-                            else if (e.alt || Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)) mod = KeyCode.LeftAlt;
-
-                            AssignKey(_listeningAction, key, mod);
-                            _listeningAction = null;
-                            e.Use();
-                        }
+                        AssignKey(_listeningIndex, mk, KeyCode.None);
+                        FinishListening();
+                        return;
                     }
                 }
             }
 
-            GUI.backgroundColor = new Color(0.2f, 0.2f, 0.2f, 1f);
-            _windowRect = GUI.Window(8493, _windowRect, _windowDelegate, "TRAINER KEYBINDS");
-            GUI.backgroundColor = _defaultBgColor;
+            if (e.type != EventType.KeyDown && e.type != EventType.MouseDown) return;
+
+            KeyCode key = KeyCode.None;
+            if (e.type == EventType.KeyDown)
+            {
+                key = e.keyCode;
+            }
+            else if (e.type == EventType.MouseDown)
+            {
+                if (e.button == 2) key = KeyCode.Mouse2;
+                else if (e.button == 3) key = KeyCode.Mouse3;
+                else if (e.button == 4) key = KeyCode.Mouse4;
+                else if (e.button == 5) key = KeyCode.Mouse5;
+                else if (e.button == 6) key = KeyCode.Mouse6;
+            }
+
+            // Ignore None, Escape and the main mouse buttons (they drive the menu itself)
+            if (key == KeyCode.None || key == KeyCode.Escape) return;
+
+            bool isModifier = Array.IndexOf(ModifierKeys, key) >= 0;
+            if (held)
+            {
+                AssignKey(_listeningIndex, key, KeyCode.None);
+            }
+            else
+            {
+                // Pure modifier keys aren't main keys here; they're caught as the modifier.
+                if (isModifier) return;
+
+                KeyCode mod = KeyCode.None;
+                if (e.shift || Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) mod = KeyCode.LeftShift;
+                else if (e.control || Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) mod = KeyCode.LeftControl;
+                else if (e.alt || Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)) mod = KeyCode.LeftAlt;
+
+                AssignKey(_listeningIndex, key, mod);
+            }
+            FinishListening();
+            e.Use();
         }
 
         private void HandleGamepadInput(Gamepad gp)
         {
-            if (_listeningAction != null)
+            if (_listeningIndex >= 0)
             {
                 // Circle / B cancels capture. The once-per-frame guard prevents this same
                 // press from also closing the menu in a later pass of the frame.
@@ -198,12 +310,14 @@ namespace FlippingIsHardTrainer
                     FinishListening();
                     return;
                 }
+                if (_listeningDevice != InputDeviceType.Gamepad) return;
 
                 // Combo-aware capture — ANY held button can be a modifier:
                 //  - 2 buttons the same frame  → combo (prefer a shoulder/trigger as modifier).
                 //  - 1 button while another is still held → combo (held = modifier).
                 //  - 1 button alone → deferred; becomes a single bind on release, or the
                 //    modifier if a second button arrives while it is held.
+                // Held binds (fly movement) take the first button alone, no combos.
                 GamepadButton? first = null, second = null;
                 foreach (var btn in AllButtons)
                 {
@@ -213,13 +327,20 @@ namespace FlippingIsHardTrainer
                     else { second = btn; break; }
                 }
 
+                if (first.HasValue && Actions[_listeningIndex].Held)
+                {
+                    AssignGamepadButton(_listeningIndex, first.Value, null);
+                    FinishListening();
+                    return;
+                }
+
                 if (first.HasValue && second.HasValue)
                 {
                     GamepadButton main, mod;
                     if (IsGpModifier(first.Value) && !IsGpModifier(second.Value)) { mod = first.Value; main = second.Value; }
                     else if (IsGpModifier(second.Value) && !IsGpModifier(first.Value)) { mod = second.Value; main = first.Value; }
                     else { mod = first.Value; main = second.Value; }
-                    AssignGamepadButton(_listeningAction, main, mod);
+                    AssignGamepadButton(_listeningIndex, main, mod);
                     FinishListening();
                     return;
                 }
@@ -229,7 +350,7 @@ namespace FlippingIsHardTrainer
                     if (_pendingGpModifier.HasValue && _pendingGpModifier.Value != first.Value &&
                         gp[_pendingGpModifier.Value].isPressed)
                     {
-                        AssignGamepadButton(_listeningAction, first.Value, _pendingGpModifier);
+                        AssignGamepadButton(_listeningIndex, first.Value, _pendingGpModifier);
                         FinishListening();
                         return;
                     }
@@ -240,7 +361,7 @@ namespace FlippingIsHardTrainer
                 // Deferred lone button released without a second button → single bind.
                 if (_pendingGpModifier.HasValue && gp[_pendingGpModifier.Value].wasReleasedThisFrame)
                 {
-                    AssignGamepadButton(_listeningAction, _pendingGpModifier.Value, null);
+                    AssignGamepadButton(_listeningIndex, _pendingGpModifier.Value, null);
                     FinishListening();
                 }
                 return;
@@ -258,7 +379,7 @@ namespace FlippingIsHardTrainer
             _wasNavDown = navDown;
 
             // Left/Right adjusts HUD Scale when that row is selected
-            if (_selectedIndex == 8)
+            if (_selectedIndex == NAV_SCALE)
             {
                 if (navLeft  && !_wasNavLeft)  AdjustTempScale(-0.05f);
                 if (navRight && !_wasNavRight) AdjustTempScale(+0.05f);
@@ -268,13 +389,43 @@ namespace FlippingIsHardTrainer
 
             if (gp[GamepadButton.South].wasPressedThisFrame)       // A / Cross — activate
                 HandleGamepadActivate(_selectedIndex);
+            else if (gp[GamepadButton.North].wasPressedThisFrame)  // Y / Triangle — clear pad bind
+            {
+                if (_selectedIndex < Actions.Length) ClearBind(_selectedIndex, InputDeviceType.Gamepad);
+            }
             else if (gp[GamepadButton.East].wasPressedThisFrame)   // B / Circle — close
                 CloseMenu();
         }
 
+        private void HandleDrag(float viewW, float viewH)
+        {
+            Vector2 mouse = MouseGui();
+            var header = new Rect(_panelPos.x, _panelPos.y, W, HEADER_H);
+            if (!_dragging && Input.GetMouseButtonDown(0) && header.Contains(mouse) && !CloseRect().Contains(mouse))
+            {
+                _dragging = true;
+                _dragOffset = mouse - _panelPos;
+            }
+            if (_dragging)
+            {
+                if (Input.GetMouseButton(0)) _panelPos = mouse - _dragOffset;
+                else _dragging = false;
+            }
+
+            _panelPos.x = Mathf.Clamp(_panelPos.x, 0f, Mathf.Max(0f, viewW - W));
+            _panelPos.y = Mathf.Clamp(_panelPos.y, 0f, Mathf.Max(0f, viewH - H));
+        }
+
+        private void StartListening(int index, InputDeviceType device)
+        {
+            _listeningIndex = index;
+            _listeningDevice = device;
+            _pendingGpModifier = null;
+        }
+
         private void FinishListening()
         {
-            _listeningAction = null;
+            _listeningIndex = -1;
             _pendingGpModifier = null;
         }
 
@@ -283,63 +434,57 @@ namespace FlippingIsHardTrainer
             return System.Array.IndexOf(GpModifiers, btn) >= 0;
         }
 
-        private KeyBind GetBind(string action)
+        private KeyBind GetBind(int index)
         {
-            if (_tempSettings == null) return null;
-            return action switch
-            {
-                "Save" => _tempSettings.SavePosition,
-                "Teleport" => _tempSettings.Teleport,
-                "Fly" => _tempSettings.ToggleFlyMode,
-                "Vel" => _tempSettings.ToggleKeepVelocity,
-                "Angle" => _tempSettings.ToggleKeepAngle,
-                "Repair" => _tempSettings.ToggleAutoRepair,
-                "Beam" => _tempSettings.ToggleHelpBeam,
-                "Menu" => _tempSettings.OpenBindMenu,
-                _ => null
-            };
+            if (_tempSettings == null || index < 0 || index >= Actions.Length) return null;
+            return Actions[index].Get(_tempSettings);
         }
 
-        private void AssignKey(string action, KeyCode main, KeyCode mod)
+        private void AssignKey(int index, KeyCode main, KeyCode mod)
         {
-            var b = GetBind(action);
+            var b = GetBind(index);
             if (b == null) return;
             b.MainKey = main;
             b.Modifier = mod;
         }
 
-        private void AssignGamepadButton(string action, GamepadButton main, GamepadButton? mod)
+        private void AssignGamepadButton(int index, GamepadButton main, GamepadButton? mod)
         {
-            var b = GetBind(action);
+            var b = GetBind(index);
             if (b == null) return;
             b.GamepadBtn = main;
             b.GamepadModifier = mod;
         }
 
+        private void ClearBind(int index, InputDeviceType device)
+        {
+            var b = GetBind(index);
+            if (b == null) return;
+            if (device == InputDeviceType.Gamepad)
+            {
+                b.GamepadBtn = null;
+                b.GamepadModifier = null;
+            }
+            else
+            {
+                b.MainKey = KeyCode.None;
+                b.Modifier = KeyCode.None;
+            }
+            if (_listeningIndex == index) FinishListening();
+        }
+
         private void HandleGamepadActivate(int index)
         {
-            string[] bindActions = { "Save", "Teleport", "Fly", "Vel", "Angle", "Repair", "Beam", "Menu" };
-            if (index < 8)
-            {
-                _listeningAction = bindActions[index];
-                _pendingGpModifier = null;
-            }
-            else if (index == 8) // HUD Scale — A increments (use ◄ ► to dec/inc)
-            {
+            if (index < Actions.Length)
+                StartListening(index, InputDeviceType.Gamepad);
+            else if (index == NAV_SCALE) // HUD Scale — A increments (use ◄ ► to dec/inc)
                 AdjustTempScale(+0.05f);
-            }
-            else if (index == 9) // Reset Defaults
-            {
+            else if (index == NAV_RESET)
                 ResetTempToDefaults();
-            }
-            else if (index == 10) // Cancel
-            {
+            else if (index == NAV_CANCEL)
                 CloseMenu();
-            }
-            else if (index == 11) // Save
-            {
+            else if (index == NAV_SAVE)
                 SaveTempSettings();
-            }
         }
 
         private void ResetTempToDefaults()
@@ -370,9 +515,15 @@ namespace FlippingIsHardTrainer
                 ToggleAutoRepair   = src.ToggleAutoRepair.Clone(),
                 ToggleHelpBeam     = src.ToggleHelpBeam.Clone(),
                 OpenBindMenu       = src.OpenBindMenu.Clone(),
+                FlyForward         = src.FlyForward.Clone(),
+                FlyBackward        = src.FlyBackward.Clone(),
+                FlyLeft            = src.FlyLeft.Clone(),
+                FlyRight           = src.FlyRight.Clone(),
+                FlyUp              = src.FlyUp.Clone(),
+                FlyDown            = src.FlyDown.Clone(),
+                FlyTurbo           = src.FlyTurbo.Clone(),
                 OverlayScale       = src.OverlayScale,
                 HelpBeamSingleplayer = src.HelpBeamSingleplayer,
-                HelpBeamSpawnLevel = src.HelpBeamSpawnLevel,
             };
         }
 
@@ -383,111 +534,192 @@ namespace FlippingIsHardTrainer
             _tempSettings.OverlayScale = Mathf.Round(next * 100f) / 100f;
         }
 
-        private void WindowFunction(int id)
+        // ── Drawing ─────────────────────────────────────────────────────────
+
+        private void DrawPanel()
         {
-            // Close X button
-            GUI.backgroundColor = Color.red;
-            if (CustomButton(new Rect(460, 5, 35, 25), "X"))
-            {
+            float px = _panelPos.x;
+            float py = _panelPos.y;
+            bool gamepadActive = Gamepad.current != null && InputDeviceTracker.Current == InputDeviceType.Gamepad;
+            bool ps = InputDeviceTracker.IsDualShock;
+
+            TrainerTheme.DrawPanel(new Rect(px, py, W, H), TrainerTheme.Panel);
+
+            // ── Header ───────────────────────────────────────────────────
+            TrainerTheme.Fill(new Rect(px + PAD, py + 18f, 4f, 30f), TrainerTheme.Accent, true);
+            TrainerTheme.Label(new Rect(px + PAD + 14f, py + 12f, 400f, 26f), "Keybinds", _styleTitle, TrainerTheme.Text);
+            TrainerTheme.Label(new Rect(px + PAD + 14f, py + 37f, W - PAD * 2f - 60f, 18f),
+                "Click a binding and press a key or button  ·  Right-click clears it", _styleSubtitle, TrainerTheme.TextDim);
+
+            if (Button(CloseRect(), "X", false, false, TrainerTheme.Danger))
                 CloseMenu();
+
+            TrainerTheme.FillRect(new Rect(px, py + HEADER_H, W, 1f), TrainerTheme.Divider);
+
+            // ── Column headers ───────────────────────────────────────────
+            float y = py + HEADER_H + 8f;
+            Rect kbCol = new Rect(px + W - PAD - CELL_W * 2f - 10f, y, CELL_W, 18f);
+            Rect gpCol = new Rect(px + W - PAD - CELL_W, y, CELL_W, 18f);
+            TrainerTheme.Label(new Rect(px + PAD, y, 200f, 18f), "ACTION", _styleCaption, TrainerTheme.TextFaint);
+            TrainerTheme.Label(kbCol, "KEYBOARD", _styleCaptionCenter, gamepadActive ? TrainerTheme.TextFaint : TrainerTheme.Accent);
+            TrainerTheme.Label(gpCol, "GAMEPAD", _styleCaptionCenter, gamepadActive ? TrainerTheme.Accent : TrainerTheme.TextFaint);
+            y = py + HEADER_H + COLS_H;
+
+            // ── Bind rows ────────────────────────────────────────────────
+            for (int i = 0; i < Actions.Length; i++)
+            {
+                if (i == 0 || i == FLY_SECTION_START)
+                {
+                    TrainerTheme.Label(new Rect(px + PAD, y + 10f, 300f, 18f),
+                        i == 0 ? "GENERAL" : "FLY MODE", _styleCaption, i == 0 ? TrainerTheme.Accent : TrainerTheme.Fly);
+                    y += SECTION_H;
+                }
+                DrawBindRow(i, px, y, gamepadActive);
+                y += ROW_H;
             }
-            GUI.backgroundColor = _defaultBgColor;
 
-            float cy = 40; // Start below the title bar
-
-            DrawBindRow(20, ref cy, "Save Position",       "Save",     _tempSettings.SavePosition,      0);
-            DrawBindRow(20, ref cy, "Teleport",            "Teleport", _tempSettings.Teleport,           1);
-            DrawBindRow(20, ref cy, "Toggle Fly Mode",     "Fly",      _tempSettings.ToggleFlyMode,      2);
-            DrawBindRow(20, ref cy, "Toggle Keep Velocity","Vel",      _tempSettings.ToggleKeepVelocity, 3);
-            DrawBindRow(20, ref cy, "Toggle Keep Angle",   "Angle",    _tempSettings.ToggleKeepAngle,    4);
-            DrawBindRow(20, ref cy, "Toggle Auto-Repair",  "Repair",   _tempSettings.ToggleAutoRepair,   5);
-            DrawBindRow(20, ref cy, "Toggle Help Beam SP", "Beam",     _tempSettings.ToggleHelpBeam,     6);
-            DrawBindRow(20, ref cy, "Open Bind Menu",      "Menu",     _tempSettings.OpenBindMenu,       7);
-
-            // ── HUD Scale row ────────────────────────────────────────────
-            cy += 4;
-            GUI.color = _selectedIndex == 8 ? Color.yellow : Color.white;
-            GUI.Label(new Rect(20, cy, 175, 24), "HUD Scale");
-            GUI.color = Color.white;
-            GUI.backgroundColor = new Color(0.4f, 0.4f, 0.4f, 1f);
-            if (CustomButton(new Rect(195, cy, 32, 24), "-"))
+            // ── HUD scale ────────────────────────────────────────────────
+            y += 6f;
+            TrainerTheme.FillRect(new Rect(px + PAD, y, W - PAD * 2f, 1f), TrainerTheme.Divider);
+            y += 6f;
+            var scaleRow = new Rect(px + PAD - 8f, y + 4f, W - PAD * 2f + 16f, SCALE_H - 8f);
+            DrawRowBackground(scaleRow, gamepadActive && _selectedIndex == NAV_SCALE);
+            TrainerTheme.Label(new Rect(px + PAD, y, 200f, SCALE_H), "HUD scale", _styleLabel, TrainerTheme.Text);
+            float sy = y + (SCALE_H - 26f) * 0.5f;
+            float sx = px + W - PAD - CELL_W;
+            if (Button(new Rect(sx, sy, 34f, 26f), "-", false, false, TrainerTheme.Accent))
                 AdjustTempScale(-0.05f);
-            GUI.Label(new Rect(232, cy, 55, 24), $"{_tempSettings.OverlayScale:F2}x");
-            if (CustomButton(new Rect(292, cy, 32, 24), "+"))
+            TrainerTheme.Label(new Rect(sx + 34f, sy, CELL_W - 68f, 26f), $"{_tempSettings.OverlayScale:F2}x", _styleChip, TrainerTheme.Text);
+            if (Button(new Rect(sx + CELL_W - 34f, sy, 34f, 26f), "+", false, false, TrainerTheme.Accent))
                 AdjustTempScale(+0.05f);
-            GUI.backgroundColor = _defaultBgColor;
-            GUI.color = Color.white;
-            cy += 30;
+            y += SCALE_H;
 
-            cy = _windowRect.height - 75; // Bottom row
-
-            // Gamepad hint footer (only while the gamepad is the active device)
-            if (Gamepad.current != null && InputDeviceTracker.Current == InputDeviceType.Gamepad)
+            // ── Hint ─────────────────────────────────────────────────────
+            string hint;
+            if (gamepadActive)
             {
-                bool ps = InputDeviceTracker.IsDualShock;
                 string sel = ps ? "Cross" : "A";
+                string clear = ps ? "Triangle" : "Y";
                 string close = ps ? "Circle" : "B";
-                string hint = _selectedIndex == 8
-                    ? $"Mando: ◄ ► ajustar escala  |  {close} cancelar/cerrar"
-                    : $"Mando: D-Pad navegar  |  {sel} seleccionar  |  {close} cancelar/cerrar";
-                GUI.color = new Color(0.7f, 0.9f, 1f);
-                GUI.Label(new Rect(20, cy, 460, 20), hint);
-                GUI.color = Color.white;
+                hint = _selectedIndex == NAV_SCALE
+                    ? $"◄ ► adjust scale  ·  {close} close"
+                    : $"D-Pad navigate  ·  {sel} rebind  ·  {clear} clear  ·  {close} cancel / close";
             }
-
-            cy = _windowRect.height - 50;
-
-            GUI.color = _selectedIndex == 9 ? Color.yellow : Color.white;
-            if (CustomButton(new Rect(20, cy, 140, 30), "Reset Defaults"))
+            else
             {
+                hint = "Esc cancels a capture  ·  Changes apply when you press Save";
+            }
+            TrainerTheme.Label(new Rect(px + PAD, y, W - PAD * 2f, HINT_H), hint, _styleSubtitle, TrainerTheme.TextFaint);
+            y += HINT_H;
+
+            // ── Buttons ──────────────────────────────────────────────────
+            if (Button(new Rect(px + PAD, y, 150f, BUTTON_H), "Reset defaults", false, gamepadActive && _selectedIndex == NAV_RESET, TrainerTheme.Danger))
                 ResetTempToDefaults();
-            }
-            GUI.color = _selectedIndex == 10 ? Color.yellow : Color.white;
-            if (CustomButton(new Rect(180, cy, 140, 30), "Cancel"))
-            {
+            if (Button(new Rect(px + W - PAD - 250f, y, 110f, BUTTON_H), "Cancel", false, gamepadActive && _selectedIndex == NAV_CANCEL, TrainerTheme.Accent))
                 CloseMenu();
-            }
-            GUI.color = _selectedIndex == 11 ? Color.yellow : Color.white;
-            if (CustomButton(new Rect(340, cy, 140, 30), "SAVE"))
-            {
+            if (Button(new Rect(px + W - PAD - 130f, y, 130f, BUTTON_H), "Save", true, gamepadActive && _selectedIndex == NAV_SAVE, TrainerTheme.Accent))
                 SaveTempSettings();
-            }
-            GUI.color = Color.white;
-
-            GUI.DragWindow(new Rect(0, 0, _windowRect.width, 40));
         }
 
-        private bool CustomButton(Rect rect, string text)
+        private void DrawBindRow(int index, float px, float y, bool gamepadActive)
         {
-            // Draw visually as a box to prevent GUI.Button from eating events
-            GUI.Box(rect, text);
-            
-            if (_clickHandledThisFrame) return false;
+            var row = new Rect(px + PAD - 8f, y + 1f, W - PAD * 2f + 16f, ROW_H - 2f);
+            DrawRowBackground(row, gamepadActive && _selectedIndex == index);
 
-            if (Input.GetMouseButtonDown(0))
+            TrainerTheme.Label(new Rect(px + PAD, y, 260f, ROW_H), Actions[index].Label, _styleLabel, TrainerTheme.Text);
+
+            float cy = y + (ROW_H - CELL_H) * 0.5f;
+            DrawBindCell(index, InputDeviceType.Keyboard, new Rect(px + W - PAD - CELL_W * 2f - 10f, cy, CELL_W, CELL_H));
+            DrawBindCell(index, InputDeviceType.Gamepad,  new Rect(px + W - PAD - CELL_W, cy, CELL_W, CELL_H));
+        }
+
+        private void DrawRowBackground(Rect row, bool selected)
+        {
+            if (selected)
             {
-                Vector2 rawMouse = Input.mousePosition;
-                rawMouse.y = Screen.height - rawMouse.y;
-                
-                Rect absRect = new Rect(_windowRect.x + rect.x, _windowRect.y + rect.y, rect.width, rect.height);
-                
-                if (absRect.Contains(rawMouse))
-                {
-                    if (Event.current.type == EventType.Repaint)
-                    {
-                        _clickHandledThisFrame = true;
-                        return true;
-                    }
-                }
+                TrainerTheme.Fill(row, TrainerTheme.AccentSoft, true);
+                TrainerTheme.Fill(new Rect(row.x, row.y + 6f, 3f, row.height - 12f), TrainerTheme.Accent, true);
             }
-            return false;
+            else if (row.Contains(MouseGui()))
+            {
+                TrainerTheme.Fill(row, TrainerTheme.Surface, true);
+            }
+        }
+
+        private void DrawBindCell(int index, InputDeviceType device, Rect r)
+        {
+            var bind = Actions[index].Get(_tempSettings);
+            bool keyboard = device == InputDeviceType.Keyboard;
+
+            if (_listeningIndex == index && _listeningDevice == device)
+            {
+                float pulse = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 6f);
+                Color bg = Color.Lerp(TrainerTheme.WarnSoft, new Color(1f, 0.75f, 0.33f, 0.34f), pulse);
+                TrainerTheme.DrawChip(r, keyboard ? "Press a key..." : "Press a button...", _styleChip, bg, TrainerTheme.Warn);
+            }
+            else
+            {
+                bool bound = keyboard ? bind.HasKeyboard : bind.HasGamepad;
+                string text = !bound ? "Not set"
+                    : keyboard ? bind.ToStringKeyboard() : bind.ToStringGamepad(InputDeviceTracker.IsDualShock);
+                Color bg = r.Contains(MouseGui()) ? TrainerTheme.ChipHover : TrainerTheme.Chip;
+                TrainerTheme.DrawChip(r, text, _styleChip, bg, bound ? TrainerTheme.Text : TrainerTheme.TextFaint);
+            }
+
+            if (Clicked(r, 0))
+                StartListening(index, device);
+            else if (Clicked(r, 1))
+                ClearBind(index, device);
+        }
+
+        // Rounded button. Primary = filled accent; otherwise a subtle surface that takes
+        // the hover color on mouse-over. Selected (gamepad focus) draws an accent ring.
+        private bool Button(Rect r, string text, bool primary, bool selected, Color hoverColor)
+        {
+            bool hover = r.Contains(MouseGui());
+            if (selected)
+                TrainerTheme.Fill(new Rect(r.x - 2f, r.y - 2f, r.width + 4f, r.height + 4f), TrainerTheme.Accent, true);
+
+            Color bg, fg;
+            if (primary)
+            {
+                bg = hover || selected ? Color.Lerp(TrainerTheme.Accent, Color.white, 0.18f) : TrainerTheme.Accent;
+                fg = new Color(0.04f, 0.07f, 0.11f, 1f);
+            }
+            else
+            {
+                bg = hover ? new Color(hoverColor.r, hoverColor.g, hoverColor.b, 0.22f) : TrainerTheme.Chip;
+                fg = hover ? hoverColor : TrainerTheme.Text;
+            }
+            TrainerTheme.DrawChip(r, text, _styleButton, bg, fg);
+            return Clicked(r, 0);
+        }
+
+        private Rect CloseRect() => new Rect(_panelPos.x + W - PAD - 30f, _panelPos.y + 18f, 30f, 30f);
+
+        // Mouse in menu space. Raw Input instead of IMGUI events because the menu's own
+        // clicks must not be eaten before the capture logic sees them.
+        private Vector2 MouseGui()
+        {
+            Vector3 m = Input.mousePosition;
+            return new Vector2(m.x, Screen.height - m.y) / _uiScale;
+        }
+
+        private bool Clicked(Rect r, int button)
+        {
+            if (_clickHandledThisFrame || Event.current.type != EventType.Repaint) return false;
+            if (!Input.GetMouseButtonDown(button) || !r.Contains(MouseGui())) return false;
+            _clickHandledThisFrame = true;
+            return true;
         }
 
         private void CloseMenu()
         {
             _isVisible = false;
             IsVisibleGlobally = false;
-            
+            _dragging = false;
+            FinishListening();
+
             // Restore disabled scripts
             EnableGameScripts();
 
@@ -509,18 +741,18 @@ namespace FlippingIsHardTrainer
         private void DisableGameScripts()
         {
             _disabledScripts.Clear();
-            
+
             // 1. Disable InputSystem globally to stop Pause menus and interactions
             var allMonos = UnityEngine.Object.FindObjectsOfType<MonoBehaviour>();
             foreach (var comp in allMonos)
             {
                 if (comp == null || !comp.enabled) continue;
-                
+
                 string ns = comp.GetType().Namespace ?? "";
                 string name = comp.GetType().Name.ToLower();
-                
-                if (ns.StartsWith("UnityEngine.InputSystem") || 
-                    name.Contains("input") || 
+
+                if (ns.StartsWith("UnityEngine.InputSystem") ||
+                    name.Contains("input") ||
                     name.Contains("pause") ||
                     name.Contains("camera") ||
                     name.Contains("look"))
@@ -584,35 +816,6 @@ namespace FlippingIsHardTrainer
                 }
             }
             _disabledScripts.Clear();
-        }
-
-        private void DrawBindRow(float x, ref float y, string label, string actionId, KeyBind currentBind, int rowIndex)
-        {
-            GUI.Label(new Rect(x, y, 200, 25), label);
-
-            bool isListening = _listeningAction == actionId;
-            bool isSelected  = _selectedIndex == rowIndex;
-
-            // Show the binding for whichever device the player is currently using.
-            string bindStr = currentBind.ToString(InputDeviceTracker.Current, InputDeviceTracker.IsDualShock);
-            string btnText = isListening
-                ? "[ Pulsa tecla o botón (Esc / B para cancelar) ]"
-                : $"[ {bindStr} ]";
-
-            if (isListening)
-                GUI.color = Color.green;
-            else if (isSelected)
-                GUI.color = Color.yellow;
-
-            if (CustomButton(new Rect(x + 180, y, 280, 25), btnText))
-            {
-                _listeningAction = actionId;
-                _pendingGpModifier = null;
-            }
-
-            GUI.color = Color.white;
-
-            y += 35;
         }
     }
 }
