@@ -44,8 +44,29 @@ namespace FlippingIsHardTrainer
         {
             if (MainKey == KeyCode.None) return "Unbound";
 
-            string modStr = Modifier == KeyCode.None ? "" : $"{Modifier} + ";
-            return $"{modStr}{MainKey}";
+            string modStr = Modifier == KeyCode.None ? "" : $"{KeyName(Modifier)} + ";
+            return $"{modStr}{KeyName(MainKey)}";
+        }
+
+        // Short display names; KeyCode.ToString() gives "LeftShift", "Alpha1", "Mouse3"...
+        public static string KeyName(KeyCode key)
+        {
+            return key switch
+            {
+                KeyCode.LeftShift or KeyCode.RightShift     => "Shift",
+                KeyCode.LeftControl or KeyCode.RightControl => "Ctrl",
+                KeyCode.LeftAlt or KeyCode.RightAlt         => "Alt",
+                KeyCode.Return                              => "Enter",
+                KeyCode.Escape                              => "Esc",
+                KeyCode.Mouse2                              => "Mouse Mid",
+                KeyCode.Mouse3                              => "Mouse 4",
+                KeyCode.Mouse4                              => "Mouse 5",
+                KeyCode.Mouse5                              => "Mouse 6",
+                KeyCode.Mouse6                              => "Mouse 7",
+                >= KeyCode.Alpha0 and <= KeyCode.Alpha9     => ((int)key - (int)KeyCode.Alpha0).ToString(),
+                >= KeyCode.Keypad0 and <= KeyCode.Keypad9   => $"Num {(int)key - (int)KeyCode.Keypad0}",
+                _                                           => key.ToString(),
+            };
         }
 
         public string ToStringGamepad(bool ps)
@@ -111,12 +132,26 @@ namespace FlippingIsHardTrainer
             { GamepadBtn = GamepadButton.DpadDown };
         public KeyBind OpenBindMenu { get; set; } = new KeyBind(KeyCode.B)
             { GamepadModifier = GamepadButton.LeftShoulder, GamepadBtn = GamepadButton.RightShoulder };
+
+        // Fly mode movement (held, not toggled). The gamepad left stick always moves as
+        // well, so the directions ship without a gamepad button.
+        // Missing in old configs -> initializers apply, so no version bump (which would
+        // wipe the user's existing binds).
+        public KeyBind FlyForward { get; set; } = new KeyBind(KeyCode.W);
+        public KeyBind FlyBackward { get; set; } = new KeyBind(KeyCode.S);
+        public KeyBind FlyLeft { get; set; } = new KeyBind(KeyCode.A);
+        public KeyBind FlyRight { get; set; } = new KeyBind(KeyCode.D);
+        public KeyBind FlyUp { get; set; } = new KeyBind(KeyCode.Space)
+            { GamepadBtn = GamepadButton.RightTrigger };
+        public KeyBind FlyDown { get; set; } = new KeyBind(KeyCode.LeftControl)
+            { GamepadBtn = GamepadButton.LeftTrigger };
+        public KeyBind FlyTurbo { get; set; } = new KeyBind(KeyCode.LeftShift)
+            { GamepadBtn = GamepadButton.East };
+
         public float OverlayScale { get; set; } = 1.0f;
         // Enable the game's multiplayer-only help beam (right-click) in singleplayer.
         // Missing in old configs -> initializer keeps it ON, so no version bump needed.
         public bool HelpBeamSingleplayer { get; set; } = true;
-        // First spawn path that proved to work (see HelpBeamUnlock levels); -1 = not yet known.
-        public int HelpBeamSpawnLevel { get; set; } = -1;
     }
 
     public static class TrainerConfig

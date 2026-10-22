@@ -16,15 +16,15 @@ A highly optimized Unity IL2CPP BepInEx plugin for "Flipping is Hard Demo" that 
   - Speed boost with Shift or B/Circle (3x faster)
   - **Momentum conserved on exit**: velocity carries over when you leave fly mode
 - **🔧 Auto-Repair on Teleport** - Toggle `G` (D-Up): when teleporting back to a saved position, if your phone is broken it is reassembled and your abilities (jump, air control, etc.) are restored. Uses the game's own destruction state machine, so it's a real repair — not just visual.
-- **🔦 Help Beam in Singleplayer** - The game's multiplayer-only help beam works in solo play too, with the exact base-game rules: **hold Right-Click** to keep the beam up (release = it disappears), it can only be summoned **while touching something** (ground or wall), and **moving away from the beam breaks your phone**, just like in multiplayer. Toggle the feature with `N` (D-Down). Perfect for practicing the mechanic before going online (inactive in real multiplayer lobbies, where the native beam takes over).
+- **🔦 Help Beam in Singleplayer** - The game's multiplayer-only help beam works in solo play too, with the exact base-game rules: **hold Right-Click** to keep the beam up (release = it disappears), it can only be summoned **while touching something** (ground or wall), and **moving away from the beam breaks your phone**, just like in multiplayer. It only lifts the game's "playing solo" check, so the game's own beam logic runs unchanged, and the beams placed around the map are left alone. Toggle the feature with `N` (D-Down). Perfect for practicing the mechanic before going online (no effect in real multiplayer lobbies, where the beam already works).
 - **🌐 Multiplayer Compatible** - Detects and acts only on your local/owned player (via network ownership / active camera). Teleport, fly, save and auto-repair all work in online lobbies; the repair also replicates so other players see your phone reassemble.
 - **⚙️ In-Game Customizable Keybinds** - Press `B` (or `L1+R1` on a gamepad) to open the fully featured Bind Menu!
-  - Remap any trainer action directly inside the game, with **keyboard or gamepad** (incl. 2-button gamepad combos).
+  - Remap **every** trainer bind directly inside the game, fly controls included, with **keyboard or gamepad** (incl. 2-button gamepad combos).
   - Automatically isolates inputs so you don't accidentally move while editing.
   - Auto-creates and saves to `com.flippingishard.trainer.json` in BepInEx config.
 - **🎮 Full Gamepad Support** - Xbox & PlayStation controllers, with the overlay/menu auto-switching to the device you're using.
 - **📍 Real-time Telemetry** - HUD in the top-right corner showing current `SPEED`, `HEIGHT`, and `XYZ` position
-- **🎮 Smart Overlay** - Real-time UI showing controls, active toggles, and saved position state
+- **🎮 Smart Overlay** - Clean, modern HUD showing your binds, active toggles, and saved position state
 - **⚡ Ultra Optimized** - Rewritten from scratch to eliminate lag spikes and stuttering during gameplay.
 
 ## 🚀 Quick Start
@@ -56,11 +56,13 @@ menu **auto-switch** to show the controls of whichever device you are currently 
 | Toggle Auto-Repair           | `G`         | D-Up      | D-Up        |
 | Toggle Help Beam SP          | `N`         | D-Down    | D-Down      |
 
-All binds are remappable in the **Keybinds Menu**, including **2-button gamepad combos**
-(hold any button and press another). Navigate the menu with the D-Pad/stick,
-**A/Cross** to select, **B/Circle** to cancel an assignment or close the menu.
+All binds, including the fly controls below, are remappable in the **Keybinds Menu**, with
+**2-button gamepad combos** (hold any button and press another). Click the Keyboard or Gamepad
+cell of an action and press the new key/button; **right-click** a cell to clear it. On a
+gamepad, navigate with the D-Pad/stick, **A/Cross** to rebind, **Y/Triangle** to clear,
+**B/Circle** to cancel an assignment or close the menu.
 
-- **Fly Mode Controls:**
+- **Fly Mode Controls** (defaults, all remappable):
   - `W` / `S` or **Left Stick** → Move forward/backward (relative to camera)
   - `A` / `D` or **Left Stick** → Move left/right (relative to camera)
   - `Space` or **RT/R2** → Move up (world space)
@@ -79,6 +81,8 @@ Trainer/
 ├── InputHandler.cs              # Keyboard / gamepad input
 ├── OverlayRenderer.cs           # HUD Renderer
 ├── PhoneRepair.cs               # Phone auto-repair via the game's destruction FSM
+├── HelpBeamUnlock.cs            # Harmony patch that lets the help beam spawn in solo play
+├── TrainerTheme.cs              # Shared UI palette, rounded shapes and font
 └── README.md                    # This file
 ```
 

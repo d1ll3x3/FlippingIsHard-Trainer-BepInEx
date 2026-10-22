@@ -114,8 +114,9 @@ namespace FlippingIsHardTrainer
                 _wasFocused = focused;
                 bool acceptInput = focused && Time.unscaledTime >= _inputGraceUntil;
 
-                // Open / close bind menu
-                if (acceptInput && _inputHandler.IsOpenBindMenuPressed())
+                // Open / close bind menu (not while the menu is capturing a bind, or assigning
+                // the menu's own key would close it)
+                if (acceptInput && !_bindMenuRenderer.IsListening && _inputHandler.IsOpenBindMenuPressed())
                 {
                     _bindMenuRenderer.ToggleVisibility();
                 }
@@ -130,11 +131,6 @@ namespace FlippingIsHardTrainer
 
                     if (_flyModeActive)
                         HandleFlyMode();
-
-                    // Help beam in singleplayer (right-click, driven by us since the game
-                    // blocks its own input path outside multiplayer)
-                    if (TrainerConfig.Settings.HelpBeamSingleplayer)
-                        HelpBeamUnlock.Update(_gameObjectFinder.FindPlayer());
                 }
                 
                 // Reducimos la frecuencia de actualización de UI a 1 vez cada varios frames para evitar lag
@@ -278,12 +274,11 @@ namespace FlippingIsHardTrainer
                 TrainerPlugin.Logger.LogInfo($"Auto-Repair {(_autoRepairActive ? "activated" : "deactivated")}");
             }
 
-            // Toggle help beam in singleplayer (N)
+            // Toggle help beam in singleplayer (N). Only gates new spawns: a beam that is
+            // already up goes away on release, as usual.
             if (_inputHandler.IsToggleHelpBeamPressed())
             {
                 TrainerConfig.Settings.HelpBeamSingleplayer = !TrainerConfig.Settings.HelpBeamSingleplayer;
-                if (!TrainerConfig.Settings.HelpBeamSingleplayer)
-                    HelpBeamUnlock.Deactivate();
                 TrainerPlugin.Logger.LogInfo($"Help Beam SP {(TrainerConfig.Settings.HelpBeamSingleplayer ? "activated" : "deactivated")}");
             }
         }
@@ -530,15 +525,15 @@ namespace FlippingIsHardTrainer
             if (right.magnitude > 0.001f) right.Normalize();
 
             float speed = _flySpeed;
-            if (_inputHandler.IsShiftPressed()) speed *= _flySpeedBoost;
+            if (_inputHandler.IsFlyTurboHeld()) speed *= _flySpeedBoost;
 
             Vector3 velocity = Vector3.zero;
-            if (_inputHandler.IsWPressed()) velocity += forward * speed;
-            if (_inputHandler.IsSPressed()) velocity -= forward * speed;
-            if (_inputHandler.IsAPressed()) velocity -= right * speed;
-            if (_inputHandler.IsDPressed()) velocity += right * speed;
-            if (_inputHandler.IsSpacePressed()) velocity.y += speed;
-            if (_inputHandler.IsCtrlPressed()) velocity.y -= speed;
+            if (_inputHandler.IsFlyForwardHeld()) velocity += forward * speed;
+            if (_inputHandler.IsFlyBackwardHeld()) velocity -= forward * speed;
+            if (_inputHandler.IsFlyLeftHeld()) velocity -= right * speed;
+            if (_inputHandler.IsFlyRightHeld()) velocity += right * speed;
+            if (_inputHandler.IsFlyUpHeld()) velocity.y += speed;
+            if (_inputHandler.IsFlyDownHeld()) velocity.y -= speed;
 
             return velocity;
         }
