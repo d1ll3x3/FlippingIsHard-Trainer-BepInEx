@@ -124,6 +124,11 @@ namespace FlippingIsHardTrainer
                 // Freeze the player while the menu is open so no input source can move it
                 HandleMenuFreeze();
 
+                // A teleport picked in the menu, now that it is closed and the player unfrozen
+                var pendingTeleport = _bindMenuRenderer.TakePendingTeleport();
+                if (pendingTeleport != null)
+                    TeleportTargets.Teleport(pendingTeleport);
+
                 // Handle trainer hotkeys only if menu is not visible and input is accepted
                 if (acceptInput && !_bindMenuRenderer.IsVisible)
                 {

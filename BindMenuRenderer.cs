@@ -8,6 +8,8 @@ namespace FlippingIsHardTrainer
 {
     public class BindMenuRenderer
     {
+        // The menu's pages, switched with the header tabs (LB / RB on a gamepad).
+        private enum Page { Keybinds, Teleports }
         // One remappable action. Held = movement-style bind (fly directions / turbo): captured
         // as a single key or button, and Shift/Ctrl/Alt are valid keys on their own.
         private sealed class BindAction
@@ -65,6 +67,9 @@ namespace FlippingIsHardTrainer
         private const float BUTTON_H   = 36f;
         private static readonly float H =
             HEADER_H + COLS_H + SECTION_H * 2f + ROW_H * Actions.Length + 12f + SCALE_H + HINT_H + BUTTON_H + PAD;
+        private const float TAB_W      = 104f;
+        private const float TP_ROW_H   = 28f;
+        private const float TP_GAP     = 20f;
 
         private GameObjectFinder _gameObjectFinder;
         private List<MonoBehaviour> _disabledScripts = new List<MonoBehaviour>();
@@ -86,6 +91,16 @@ namespace FlippingIsHardTrainer
         private bool _stylesReady = false;
 
         private TrainerSettings _tempSettings;
+
+        private Page _page = Page.Keybinds;
+        // Teleports page gamepad focus: column (0 levels, 1 NPCs) and row within it.
+        private int _tpColumn = 0;
+        private int _tpRow = 0;
+        private bool _wasShoulderLeft = false;
+        private bool _wasShoulderRight = false;
+        // Set by the Teleports page and carried out by TrainerController once the menu is
+        // closed and the player unfrozen: the freeze would pin a teleported player back.
+        private TeleportTarget _pendingTeleport;
 
         // Listening state (-1 = not capturing)
         private int _listeningIndex = -1;
@@ -131,6 +146,14 @@ namespace FlippingIsHardTrainer
         public bool IsListening => _listeningIndex >= 0;
         public Action OnMenuClosed;
 
+        /// <summary>The teleport picked in the menu, once; null when there is none.</summary>
+        public TeleportTarget TakePendingTeleport()
+        {
+            var t = _pendingTeleport;
+            _pendingTeleport = null;
+            return t;
+        }
+
         public BindMenuRenderer(GameObjectFinder gameObjectFinder)
         {
             _gameObjectFinder = gameObjectFinder;
@@ -162,6 +185,7 @@ namespace FlippingIsHardTrainer
                 _tempSettings = CloneSettings(TrainerConfig.Settings);
                 FinishListening();
                 _needsCentering = true;
+                if (_page == Page.Teleports) TeleportTargets.Refresh(force: true);
             }
         }
 
@@ -367,6 +391,20 @@ namespace FlippingIsHardTrainer
                 return;
             }
 
+            // LB / RB switch pages (edge-triggered).
+            bool shoulderLeft  = gp[GamepadButton.LeftShoulder].isPressed;
+            bool shoulderRight = gp[GamepadButton.RightShoulder].isPressed;
+            if (shoulderLeft && !_wasShoulderLeft)   SwitchPage(Page.Keybinds);
+            if (shoulderRight && !_wasShoulderRight) SwitchPage(Page.Teleports);
+            _wasShoulderLeft  = shoulderLeft;
+            _wasShoulderRight = shoulderRight;
+
+            if (_page == Page.Teleports)
+            {
+                HandleTeleportsNavigation(gp);
+                return;
+            }
+
             // Navigation (not listening)
             bool navUp    = gp.dpad.up.isPressed    || gp.leftStick.y.ReadValue() >  0.7f;
             bool navDown  = gp.dpad.down.isPressed  || gp.leftStick.y.ReadValue() < -0.7f;
@@ -395,6 +433,52 @@ namespace FlippingIsHardTrainer
             }
             else if (gp[GamepadButton.East].wasPressedThisFrame)   // B / Circle — close
                 CloseMenu();
+        }
+
+        private void HandleTeleportsNavigation(Gamepad gp)
+        {
+            bool navUp    = gp.dpad.up.isPressed    || gp.leftStick.y.ReadValue() >  0.7f;
+            bool navDown  = gp.dpad.down.isPressed  || gp.leftStick.y.ReadValue() < -0.7f;
+            bool navLeft  = gp.dpad.left.isPressed  || gp.leftStick.x.ReadValue() < -0.7f;
+            bool navRight = gp.dpad.right.isPressed || gp.leftStick.x.ReadValue() >  0.7f;
+
+            int count = TeleportColumn(_tpColumn).Length;
+            if (navUp   && !_wasNavUp   && count > 0) _tpRow = (_tpRow - 1 + count) % count;
+            if (navDown && !_wasNavDown && count > 0) _tpRow = (_tpRow + 1) % count;
+            if ((navLeft && !_wasNavLeft) || (navRight && !_wasNavRight))
+            {
+                _tpColumn = 1 - _tpColumn;
+                _tpRow = Mathf.Min(_tpRow, Mathf.Max(0, TeleportColumn(_tpColumn).Length - 1));
+            }
+            _wasNavUp    = navUp;
+            _wasNavDown  = navDown;
+            _wasNavLeft  = navLeft;
+            _wasNavRight = navRight;
+
+            var column = TeleportColumn(_tpColumn);
+            if (gp[GamepadButton.South].wasPressedThisFrame && _tpRow < column.Length && TeleportTargets.IsStoryMap())
+                PickTeleport(column[_tpRow]);
+            else if (gp[GamepadButton.East].wasPressedThisFrame)
+                CloseMenu();
+        }
+
+        private static TeleportTarget[] TeleportColumn(int column)
+            => column == 0 ? TeleportTargets.Levels : TeleportTargets.Npcs;
+
+        private void SwitchPage(Page page)
+        {
+            if (_page == page) return;
+            _page = page;
+            FinishListening();
+            // Rebuilt on opening: a list built while the level was still spawning its
+            // objects could be missing some.
+            if (page == Page.Teleports) TeleportTargets.Refresh(force: true);
+        }
+
+        private void PickTeleport(TeleportTarget target)
+        {
+            _pendingTeleport = target;
+            CloseMenu();
         }
 
         private void HandleDrag(float viewW, float viewH)
@@ -546,15 +630,32 @@ namespace FlippingIsHardTrainer
             TrainerTheme.DrawPanel(new Rect(px, py, W, H), TrainerTheme.Panel);
 
             // ── Header ───────────────────────────────────────────────────
+            bool teleports = _page == Page.Teleports;
             TrainerTheme.Fill(new Rect(px + PAD, py + 18f, 4f, 30f), TrainerTheme.Accent, true);
-            TrainerTheme.Label(new Rect(px + PAD + 14f, py + 12f, 400f, 26f), "Keybinds", _styleTitle, TrainerTheme.Text);
-            TrainerTheme.Label(new Rect(px + PAD + 14f, py + 37f, W - PAD * 2f - 60f, 18f),
-                "Click a binding and press a key or button  ·  Right-click clears it", _styleSubtitle, TrainerTheme.TextDim);
+            TrainerTheme.Label(new Rect(px + PAD + 14f, py + 12f, 240f, 26f), teleports ? "Teleports" : "Keybinds", _styleTitle, TrainerTheme.Text);
+            TrainerTheme.Label(new Rect(px + PAD + 14f, py + 37f, W - PAD * 2f - TAB_W * 2f - 60f, 18f),
+                teleports ? "Click a level or an NPC to go there" : "Click a binding and press a key or button  ·  Right-click clears it",
+                _styleSubtitle, TrainerTheme.TextDim);
+
+            // Page tabs, left of the close button.
+            float tabX = px + W - PAD - 30f - 12f - TAB_W * 2f - 6f;
+            if (Button(new Rect(tabX, py + 18f, TAB_W, 30f), gamepadActive ? (ps ? "L1  Keybinds" : "LB  Keybinds") : "Keybinds",
+                    !teleports, false, TrainerTheme.Accent))
+                SwitchPage(Page.Keybinds);
+            if (Button(new Rect(tabX + TAB_W + 6f, py + 18f, TAB_W, 30f), gamepadActive ? (ps ? "Teleports  R1" : "Teleports  RB") : "Teleports",
+                    teleports, false, TrainerTheme.Accent))
+                SwitchPage(Page.Teleports);
 
             if (Button(CloseRect(), "X", false, false, TrainerTheme.Danger))
                 CloseMenu();
 
             TrainerTheme.FillRect(new Rect(px, py + HEADER_H, W, 1f), TrainerTheme.Divider);
+
+            if (teleports)
+            {
+                DrawTeleportsPage(px, py, gamepadActive, ps);
+                return;
+            }
 
             // ── Column headers ───────────────────────────────────────────
             float y = py + HEADER_H + 8f;
@@ -619,6 +720,49 @@ namespace FlippingIsHardTrainer
                 CloseMenu();
             if (Button(new Rect(px + W - PAD - 130f, y, 130f, BUTTON_H), "Save", true, gamepadActive && _selectedIndex == NAV_SAVE, TrainerTheme.Accent))
                 SaveTempSettings();
+        }
+
+        // Two columns, levels and NPCs, of buttons; a click (or A on the focused one) closes
+        // the menu and teleports there.
+        private void DrawTeleportsPage(float px, float py, bool gamepadActive, bool ps)
+        {
+            float y = py + HEADER_H + 14f;
+            bool ready = TeleportTargets.IsPlayerReady();
+            bool story = ready && TeleportTargets.IsStoryMap();
+            if (!story)
+            {
+                TrainerTheme.Label(new Rect(px + PAD, y, W - PAD * 2f, 24f),
+                    ready ? "Teleports are for the story map." : "Load into a level first.", _styleLabel, TrainerTheme.TextDim);
+            }
+            else
+            {
+                float colW = (W - PAD * 2f - TP_GAP) * 0.5f;
+                DrawTeleportColumn(0, "LEVELS", px + PAD, y, colW, gamepadActive);
+                DrawTeleportColumn(1, "NPCS", px + PAD + colW + TP_GAP, y, colW, gamepadActive);
+            }
+
+            float by = py + H - PAD - BUTTON_H;
+            string close = ps ? "Circle" : "B";
+            string hint = gamepadActive
+                ? $"D-Pad navigate  ·  {(ps ? "Cross" : "A")} teleport  ·  {close} close"
+                : "The menu closes and you land there";
+            TrainerTheme.Label(new Rect(px + PAD, by - HINT_H, W - PAD * 2f, HINT_H), hint, _styleSubtitle, TrainerTheme.TextFaint);
+            if (Button(new Rect(px + W - PAD - 130f, by, 130f, BUTTON_H), "Close", false, false, TrainerTheme.Accent))
+                CloseMenu();
+        }
+
+        private void DrawTeleportColumn(int column, string caption, float x, float y, float w, bool gamepadActive)
+        {
+            TrainerTheme.Label(new Rect(x, y, w, 18f), caption, _styleCaption, column == 0 ? TrainerTheme.Accent : TrainerTheme.Fly);
+            y += 24f;
+            var targets = TeleportColumn(column);
+            for (int i = 0; i < targets.Length; i++)
+            {
+                bool selected = gamepadActive && _tpColumn == column && _tpRow == i;
+                if (Button(new Rect(x, y, w, TP_ROW_H - 4f), targets[i].Name, false, selected, column == 0 ? TrainerTheme.Accent : TrainerTheme.Fly))
+                    PickTeleport(targets[i]);
+                y += TP_ROW_H;
+            }
         }
 
         private void DrawBindRow(int index, float px, float y, bool gamepadActive)

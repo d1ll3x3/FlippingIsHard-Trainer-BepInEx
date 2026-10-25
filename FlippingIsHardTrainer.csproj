@@ -54,6 +54,18 @@
       <HintPath>lib\Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="Unity.Cinemachine">
+      <HintPath>lib\Unity.Cinemachine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.Splines">
+      <HintPath>lib\Unity.Splines.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.Mathematics">
+      <HintPath>lib\Unity.Mathematics.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
 </Project>

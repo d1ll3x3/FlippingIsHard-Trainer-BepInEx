@@ -22,6 +22,7 @@ A highly optimized Unity IL2CPP BepInEx plugin for "Flipping is Hard Demo" that 
   - Remap **every** trainer bind directly inside the game, fly controls included, with **keyboard or gamepad** (incl. 2-button gamepad combos).
   - Automatically isolates inputs so you don't accidentally move while editing.
   - Auto-creates and saves to `com.flippingishard.trainer.json` in BepInEx config.
+- **🗺️ Level & NPC Teleports** - The menu's **Teleports** tab (`LB`/`RB` on a gamepad switch tabs) takes you to the start of any story level or in front of any NPC; L10 and the Narrator land in front of the boss door. Same targets as [FIH Ghost](https://github.com/d1ll3x3/FIH_Ghost). Story map only.
 - **🎮 Full Gamepad Support** - Xbox & PlayStation controllers, with the overlay/menu auto-switching to the device you're using.
 - **📍 Real-time Telemetry** - HUD in the top-right corner showing current `SPEED`, `HEIGHT`, and `XYZ` position
 - **🎮 Smart Overlay** - Clean, modern HUD showing your binds, active toggles, and saved position state
@@ -76,7 +77,8 @@ Trainer/
 ├── TrainerPlugin.cs             # Main BepInEx entry point
 ├── TrainerController.cs         # Core logic and optimization
 ├── TrainerConfig.cs             # Configuration and JSON save/load system
-├── BindMenuRenderer.cs          # In-game interactive UI for custom keybinds
+├── BindMenuRenderer.cs          # In-game interactive UI: keybinds and teleports tabs
+├── TeleportTargets.cs           # Level and NPC teleport targets (same as FIH Ghost)
 ├── GameObjectFinder.cs          # Smart, lag-free local-player finder (multiplayer-aware)
 ├── InputHandler.cs              # Keyboard / gamepad input
 ├── OverlayRenderer.cs           # HUD Renderer
@@ -90,7 +92,7 @@ Trainer/
 If you want to compile the mod yourself:
 1. Clone the repository.
 2. Ensure you have the **.NET 6.0 SDK** installed.
-3. Provide the reference assemblies in a `lib/` folder (not shipped, as they are game/Unity binaries). Copy them from your game's `BepInEx/interop` folder: `Assembly-CSharp.dll`, `Il2CppSystem.dll`, `Il2Cppmscorlib.dll`, `Unity.InputSystem.dll`, and the `UnityEngine.*Module.dll` files referenced in the `.csproj`.
+3. Provide the reference assemblies in a `lib/` folder (not shipped, as they are game/Unity binaries). Copy them from your game's `BepInEx/interop` folder: `Assembly-CSharp.dll`, `Il2CppSystem.dll`, `Il2Cppmscorlib.dll`, `Unity.InputSystem.dll`, `Unity.Cinemachine.dll`, `Unity.Splines.dll`, `Unity.Mathematics.dll`, and the `UnityEngine.*Module.dll` files referenced in the `.csproj`.
 4. Run the command `dotnet build -c Release` in the project root.
 5. The `.dll` file will be generated in the `bin/Release/net6.0/` folder.
 
