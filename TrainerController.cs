@@ -30,7 +30,8 @@ namespace FlippingIsHardTrainer
         private InputHandler _inputHandler;
         private OverlayRenderer _overlayRenderer;
         private BindMenuRenderer _bindMenuRenderer;
-        
+        private GhostMode _ghostMode;
+
         // Current state for overlay
         private Vector3 _currentPosition = Vector3.zero;
 
@@ -65,7 +66,8 @@ namespace FlippingIsHardTrainer
                 _inputHandler = new InputHandler();
                 _overlayRenderer = new OverlayRenderer();
                 _overlayRenderer.RefreshKeybinds();
-                _bindMenuRenderer = new BindMenuRenderer(_gameObjectFinder);
+                _ghostMode = new GhostMode(() => _flyModeActive);
+                _bindMenuRenderer = new BindMenuRenderer(_gameObjectFinder, _ghostMode);
                 _bindMenuRenderer.OnMenuClosed = () => {
                     _overlayRenderer.RefreshKeybinds(_lastDevice);
                 };
@@ -127,7 +129,16 @@ namespace FlippingIsHardTrainer
                 // A teleport picked in the menu, now that it is closed and the player unfrozen
                 var pendingTeleport = _bindMenuRenderer.TakePendingTeleport();
                 if (pendingTeleport != null)
+                {
+                    _ghostMode.CancelAttempt();
                     TeleportTargets.Teleport(pendingTeleport);
+                }
+
+                // Same for a ghost picked in the Ghost tab to play or spectate: spectating
+                // freezes the phone, which the menu's own freeze would undo.
+                _bindMenuRenderer.TakePendingGhostAction()?.Invoke();
+
+                _ghostMode.Update();
 
                 // Handle trainer hotkeys only if menu is not visible and input is accepted
                 if (acceptInput && !_bindMenuRenderer.IsVisible)
@@ -151,6 +162,48 @@ namespace FlippingIsHardTrainer
             }
         }
         
+        public void FixedUpdate()
+        {
+            try
+            {
+                if (!enabled) return;
+                _ghostMode.FixedUpdate();
+            }
+            catch (Exception ex)
+            {
+                TrainerPlugin.Logger.LogError($"Error in TrainerController.FixedUpdate: {ex}");
+                _ghostMode.CancelAttempt();
+            }
+        }
+
+        public void LateUpdate()
+        {
+            try
+            {
+                if (!enabled) return;
+                _ghostMode.LateUpdate();
+            }
+            catch (Exception ex)
+            {
+                TrainerPlugin.Logger.LogError($"Error in TrainerController.LateUpdate: {ex}");
+                _ghostMode.StopPlayback();
+                _ghostMode.CancelAttempt();
+            }
+        }
+
+        /// <summary>Called when the game is closing: a hand-made ghost recording is saved.</summary>
+        public void Shutdown()
+        {
+            try
+            {
+                _ghostMode?.Shutdown();
+            }
+            catch (Exception ex)
+            {
+                TrainerPlugin.Logger.LogError($"Error in TrainerController.Shutdown: {ex}");
+            }
+        }
+
         public void OnGUI()
         {
             try
@@ -189,6 +242,9 @@ namespace FlippingIsHardTrainer
 
         private void BeginFreeze()
         {
+            // The attempt's clock would keep running on a frozen phone.
+            _ghostMode.CancelAttempt();
+
             var t = _gameObjectFinder.FindPlayerTransform();
             if (t != null)
             {
@@ -246,10 +302,13 @@ namespace FlippingIsHardTrainer
                 SavePosition();
             }
             
-            // Teleport to saved position (R)
+            // Teleport to saved position (R); in ghost mode, back to the ghost start instead
             if (_inputHandler.IsTeleportPressed())
             {
-                TeleportToSavedPosition();
+                if (_ghostMode.Active)
+                    RestartGhost();
+                else
+                    TeleportToSavedPosition();
             }
             
             // Toggle fly mode (F)
@@ -286,6 +345,35 @@ namespace FlippingIsHardTrainer
                 TrainerConfig.Settings.HelpBeamSingleplayer = !TrainerConfig.Settings.HelpBeamSingleplayer;
                 TrainerPlugin.Logger.LogInfo($"Help Beam SP {(TrainerConfig.Settings.HelpBeamSingleplayer ? "activated" : "deactivated")}");
             }
+
+            // Ghost mode (H). Its other binds only work while it is on, like the HUD only
+            // shows them then: set start (Y), set end (P), record (U), play (I), spectate (O).
+            // Polled every frame either way, so a press made while off doesn't fire on turning it on.
+            if (_inputHandler.IsToggleGhostModePressed())
+                _ghostMode.ToggleActive();
+            bool setStart = _inputHandler.IsGhostSetStartPressed();
+            bool setEnd = _inputHandler.IsGhostSetEndPressed();
+            bool record = _inputHandler.IsGhostRecordPressed();
+            bool play = _inputHandler.IsGhostPlayPressed();
+            bool spectate = _inputHandler.IsGhostSpectatePressed();
+            if (_ghostMode.Active)
+            {
+                if (setStart) _ghostMode.SetStart();
+                if (setEnd) _ghostMode.SetEnd();
+                if (record) _ghostMode.ToggleRecording();
+                if (play) _ghostMode.TogglePlay();
+                if (spectate) _ghostMode.ToggleSpectate();
+            }
+        }
+
+        private void RestartGhost()
+        {
+            // An attempt starts on the ground, not flying through walls.
+            if (_flyModeActive)
+                ToggleFlyMode();
+
+            if (_ghostMode.Restart())
+                RepairIfEnabled();
         }
         
         private void SavePosition()
@@ -398,18 +486,7 @@ namespace FlippingIsHardTrainer
                     playerTransform.position = _savedPosition;
                     playerTransform.rotation = _savedRotation;
 
-                    // Return the phone repaired when the toggle is on. We call the game's
-                    // own reassemble RPC unconditionally — if the phone isn't broken the
-                    // server no-ops. (PhoneContext.IsDestroyed proved unreliable as a gate.)
-                    if (_autoRepairActive)
-                    {
-                        var localPlayer = _gameObjectFinder.FindPlayer();
-                        if (localPlayer != null)
-                        {
-                            PhoneRepair.IsPhoneBroken(localPlayer); // logs IsDestroyed for diagnostics
-                            PhoneRepair.RepairPhone(localPlayer);
-                        }
-                    }
+                    RepairIfEnabled();
 
                     TrainerPlugin.Logger.LogInfo($"Teleported to saved position: {_savedPosition}");
                 }
@@ -424,6 +501,21 @@ namespace FlippingIsHardTrainer
             }
         }
         
+        // Return the phone repaired when the toggle is on. We call the game's own reassemble
+        // RPC unconditionally — if the phone isn't broken the server no-ops.
+        // (PhoneContext.IsDestroyed proved unreliable as a gate.)
+        private void RepairIfEnabled()
+        {
+            if (!_autoRepairActive) return;
+
+            var localPlayer = _gameObjectFinder.FindPlayer();
+            if (localPlayer != null)
+            {
+                PhoneRepair.IsPhoneBroken(localPlayer); // logs IsDestroyed for diagnostics
+                PhoneRepair.RepairPhone(localPlayer);
+            }
+        }
+
         // Hard-disable the game's native fly cheat component so it can never run. Its toggle
         // is Shift+F, which collides with the trainer's fly (F) + turbo (Shift); disabling the
         // component stops its FixedUpdate/HandleFlying entirely, leaving ONLY the trainer's fly.
@@ -450,6 +542,10 @@ namespace FlippingIsHardTrainer
             {
                 _flyModeActive = !_flyModeActive;
                 _overlayRenderer.SetFlyModeActive(_flyModeActive);
+
+                // Flying through walls doesn't count as an attempt.
+                if (_flyModeActive)
+                    _ghostMode.CancelAttempt();
 
                 var rb = _gameObjectFinder.GetCachedPlayerRigidbody();
                 if (rb != null)
@@ -579,6 +675,15 @@ namespace FlippingIsHardTrainer
                     _keepAngleActive,
                     _autoRepairActive,
                     TrainerConfig.Settings.HelpBeamSingleplayer
+                );
+                _overlayRenderer.UpdateGhost(
+                    _ghostMode.Active,
+                    _ghostMode.Course.HasStart,
+                    _ghostMode.Course.HasEnd,
+                    _ghostMode.IsRecording,
+                    _ghostMode.IsPlaying && !_ghostMode.Spectating,
+                    _ghostMode.Spectating,
+                    _ghostMode.StatusText()
                 );
             }
             catch (Exception ex)

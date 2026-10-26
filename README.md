@@ -22,6 +22,10 @@ A highly optimized Unity IL2CPP BepInEx plugin for "Flipping is Hard Demo" that 
   - Remap **every** trainer bind directly inside the game, fly controls included, with **keyboard or gamepad** (incl. 2-button gamepad combos).
   - Automatically isolates inputs so you don't accidentally move while editing.
   - Auto-creates and saves to `com.flippingishard.trainer.json` in BepInEx config.
+- **👻 Ghost Mode** - Turn it on with `H`: its binds then show on the HUD and work. Stand where you want and set the map's **start** (`Y`) and **end zone** (`P`; its size is in the menu's **Ghost** tab). The Teleport bind (`R`) then takes you back to the start instead of your saved position: the attempt is recorded from your first input until the phone enters the end zone, saved, and kept as the map's **PB** when it is your best. Your PB (or the ghost you pick in the tab) races you from the same moment.
+  - Record (`U`), play (`I`) and spectate (`O`, the camera follows the ghost while your phone waits) any ghost. Turning ghost mode off stops them.
+  - The Ghost tab lists every ghost (PB, recordings, imports) with **Export** / **Import** through the Windows file dialog. Files use the same `.fihghost` format as [FIH Ghost](https://github.com/d1ll3x3/FIH_Ghost), so ghosts move between both mods.
+  - Ghosts are saved in a `Ghosts` folder next to the trainer's `.dll`. Moving the start or the end keeps the old PB in the list as a recording, and the next finished attempt is the new PB.
 - **🗺️ Level & NPC Teleports** - The menu's **Teleports** tab (`LB`/`RB` on a gamepad switch tabs) takes you to the start of any story level or in front of any NPC; L10 and the Narrator land in front of the boss door. Same targets as [FIH Ghost](https://github.com/d1ll3x3/FIH_Ghost). Story map only.
 - **🎮 Full Gamepad Support** - Xbox & PlayStation controllers, with the overlay/menu auto-switching to the device you're using.
 - **📍 Real-time Telemetry** - HUD in the top-right corner showing current `SPEED`, `HEIGHT`, and `XYZ` position
@@ -50,12 +54,18 @@ menu **auto-switch** to show the controls of whichever device you are currently 
 |------------------------------|-------------|-----------|-------------|
 | Open Keybinds Menu           | `B`         | LB + RB   | L1 + R1     |
 | Save position                | `Shift + R` | LB + X    | L1 + Square |
-| Teleport to saved position   | `R`         | X         | Square      |
+| Teleport to saved position (ghost mode: restart at the ghost start) | `R` | X | Square |
 | Toggle Fly Mode              | `F`         | L3        | L3          |
 | Toggle Keep Velocity         | `V`         | D-Left    | D-Left      |
 | Toggle Keep Angle            | `C`         | D-Right   | D-Right     |
 | Toggle Auto-Repair           | `G`         | D-Up      | D-Up        |
 | Toggle Help Beam SP          | `N`         | D-Down    | D-Down      |
+| Toggle Ghost Mode            | `H`         | LB + Y    | L1 + Triangle |
+| Set the ghost start (ghost mode) | `Y`     | LB + D-Left | L1 + D-Left |
+| Set the ghost end (ghost mode)   | `P`     | LB + B    | L1 + Circle |
+| Record / stop a ghost        | `U`         | LB + D-Up | L1 + D-Up   |
+| Play / stop a ghost          | `I`         | LB + D-Right | L1 + D-Right |
+| Spectate / stop a ghost      | `O`         | LB + D-Down | L1 + D-Down |
 
 All binds, including the fly controls below, are remappable in the **Keybinds Menu**, with
 **2-button gamepad combos** (hold any button and press another). Click the Keyboard or Gamepad
@@ -77,8 +87,17 @@ Trainer/
 ├── TrainerPlugin.cs             # Main BepInEx entry point
 ├── TrainerController.cs         # Core logic and optimization
 ├── TrainerConfig.cs             # Configuration and JSON save/load system
-├── BindMenuRenderer.cs          # In-game interactive UI: keybinds and teleports tabs
+├── BindMenuRenderer.cs          # In-game interactive UI: keybinds, teleports and ghost tabs
 ├── TeleportTargets.cs           # Level and NPC teleport targets (same as FIH Ghost)
+├── GhostMode.cs                 # Ghost mode: start/end, attempts and PB, record, play, spectate, export/import
+├── GhostCourse.cs               # Ghost mode start and end per map (JSON)
+├── GhostLibrary.cs              # The ghosts listed in the Ghost tab
+├── GhostRecording.cs            # .fihghost file format (same as FIH Ghost)
+├── GhostRecorder.cs             # Records the phone every physics tick
+├── GhostPlayback.cs             # Plays a recording on a ghost body
+├── GhostBody.cs                 # Translucent copy of the bare phone
+├── LineBox.cs                   # Start marker and end zone wireframes
+├── NativeFileDialog.cs          # Windows open/save dialogs for import/export
 ├── GameObjectFinder.cs          # Smart, lag-free local-player finder (multiplayer-aware)
 ├── InputHandler.cs              # Keyboard / gamepad input
 ├── OverlayRenderer.cs           # HUD Renderer

@@ -133,6 +133,22 @@ namespace FlippingIsHardTrainer
         public KeyBind OpenBindMenu { get; set; } = new KeyBind(KeyCode.B)
             { GamepadModifier = GamepadButton.LeftShoulder, GamepadBtn = GamepadButton.RightShoulder };
 
+        // Ghost mode. Keys clear of FIH Ghost's J K L, so both mods can run together; on a
+        // gamepad, LB combos like Save. Missing in old configs -> initializers apply, so no
+        // version bump.
+        public KeyBind ToggleGhostMode { get; set; } = new KeyBind(KeyCode.H)
+            { GamepadModifier = GamepadButton.LeftShoulder, GamepadBtn = GamepadButton.North };
+        public KeyBind GhostSetStart { get; set; } = new KeyBind(KeyCode.Y)
+            { GamepadModifier = GamepadButton.LeftShoulder, GamepadBtn = GamepadButton.DpadLeft };
+        public KeyBind GhostSetEnd { get; set; } = new KeyBind(KeyCode.P)
+            { GamepadModifier = GamepadButton.LeftShoulder, GamepadBtn = GamepadButton.East };
+        public KeyBind GhostRecord { get; set; } = new KeyBind(KeyCode.U)
+            { GamepadModifier = GamepadButton.LeftShoulder, GamepadBtn = GamepadButton.DpadUp };
+        public KeyBind GhostPlay { get; set; } = new KeyBind(KeyCode.I)
+            { GamepadModifier = GamepadButton.LeftShoulder, GamepadBtn = GamepadButton.DpadRight };
+        public KeyBind GhostSpectate { get; set; } = new KeyBind(KeyCode.O)
+            { GamepadModifier = GamepadButton.LeftShoulder, GamepadBtn = GamepadButton.DpadDown };
+
         // Fly mode movement (held, not toggled). The gamepad left stick always moves as
         // well, so the directions ship without a gamepad button.
         // Missing in old configs -> initializers apply, so no version bump (which would

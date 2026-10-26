@@ -14,6 +14,15 @@ namespace FlippingIsHardTrainer
         private bool _helpBeamSpActive = false;
         private bool _showOverlay = true;
 
+        // Ghost mode
+        private bool _ghostModeActive = false;
+        private bool _ghostHasStart = false;
+        private bool _ghostHasEnd = false;
+        private bool _ghostRecording = false;
+        private bool _ghostPlaying = false;
+        private bool _ghostSpectating = false;
+        private string _ghostStatus = null;
+
         // Telemetry caching
         private Vector3? _cachedCoords = null;
         private string _cachedHeightStr = "0.0 m";
@@ -30,6 +39,12 @@ namespace FlippingIsHardTrainer
         private string _keyRepair;
         private string _keyBeam;
         private string _keyMenu;
+        private string _keyGhostMode;
+        private string _keyGhostSetStart;
+        private string _keyGhostSetEnd;
+        private string _keyGhostRecord;
+        private string _keyGhostPlay;
+        private string _keyGhostSpectate;
         private string _strFlyControls = "";
         private bool _layoutDirty = true;
 
@@ -43,6 +58,9 @@ namespace FlippingIsHardTrainer
         private const float BASE_PILL_W   = 52f;
         private const float BASE_FLY_H    = 46f;
         private const float BASE_STATS_W  = 220f;
+        private const float BASE_SECTION_H = 12f;
+        private const float BASE_STATUS_H = 20f;
+        private const int GHOST_ROWS_ON = 6;
 
         private float Scale => Mathf.Clamp(TrainerConfig.Settings.OverlayScale, 0.25f, 2.0f);
         private float _cachedScale = -1f;
@@ -84,6 +102,17 @@ namespace FlippingIsHardTrainer
             _showOverlay = Application.isFocused;
         }
 
+        public void UpdateGhost(bool modeActive, bool hasStart, bool hasEnd, bool recording, bool playing, bool spectating, string status)
+        {
+            _ghostModeActive = modeActive;
+            _ghostHasStart = hasStart;
+            _ghostHasEnd = hasEnd;
+            _ghostRecording = recording;
+            _ghostPlaying = playing;
+            _ghostSpectating = spectating;
+            _ghostStatus = status;
+        }
+
         public void SetPositionSaved(bool saved) => _hasSavedPosition = saved;
         public void SetFlyModeActive(bool active) => _flyModeActive = active;
 
@@ -100,6 +129,12 @@ namespace FlippingIsHardTrainer
             // Toggle bind shown; the beam itself is used with the game's right-click.
             _keyBeam     = s.ToggleHelpBeam.ToString(device, ps);
             _keyMenu     = s.OpenBindMenu.ToString(device, ps);
+            _keyGhostMode     = s.ToggleGhostMode.ToString(device, ps);
+            _keyGhostSetStart = s.GhostSetStart.ToString(device, ps);
+            _keyGhostSetEnd   = s.GhostSetEnd.ToString(device, ps);
+            _keyGhostRecord   = s.GhostRecord.ToString(device, ps);
+            _keyGhostPlay     = s.GhostPlay.ToString(device, ps);
+            _keyGhostSpectate = s.GhostSpectate.ToString(device, ps);
 
             // Fly-mode control hint, built from the current binds of the active device.
             string move = device == InputDeviceType.Gamepad
@@ -144,7 +179,8 @@ namespace FlippingIsHardTrainer
             {
                 // Size the key column to the longest bind (gamepad combos are wide).
                 float widest = 0f;
-                foreach (var k in new[] { _keySave, _keyTeleport, _keyFly, _keyVel, _keyAngle, _keyRepair, _keyBeam, _keyMenu })
+                foreach (var k in new[] { _keySave, _keyTeleport, _keyFly, _keyVel, _keyAngle, _keyRepair, _keyBeam, _keyMenu,
+                                          _keyGhostMode, _keyGhostSetStart, _keyGhostSetEnd, _keyGhostRecord, _keyGhostPlay, _keyGhostSpectate })
                     widest = Mathf.Max(widest, _styleChip.CalcSize(new GUIContent(k ?? "")).x);
                 _chipW = Mathf.Clamp(widest + 18f * scale, 64f * scale, 170f * scale);
                 _layoutDirty = false;
@@ -160,8 +196,11 @@ namespace FlippingIsHardTrainer
             float rowH = BASE_ROW_H * sc;
             float chipH = BASE_CHIP_H * sc;
             float w = pad * 2f + _chipW + 10f * sc + BASE_LABEL_W * sc + BASE_PILL_W * sc;
-            float h = pad * 2f + BASE_HEADER_H * sc + 8f * sc + rowH * 7f + 17f * sc + chipH;
+            // Ghost mode shows only its own toggle until it is turned on.
+            int ghostRows = _ghostModeActive ? GHOST_ROWS_ON : 1;
+            float h = pad * 2f + BASE_HEADER_H * sc + 8f * sc + rowH * (7f + ghostRows) + BASE_SECTION_H * sc + 17f * sc + chipH;
             if (_flyModeActive) h += (BASE_FLY_H + 8f) * sc;
+            if (_ghostStatus != null) h += BASE_STATUS_H * sc;
 
             float x = BASE_MARGIN;
             float y = Screen.height - h - BASE_MARGIN;
@@ -186,12 +225,38 @@ namespace FlippingIsHardTrainer
             }
 
             DrawRow(cx, ref cy, innerW, _keySave, "Save position", null, false, TrainerTheme.On);
-            DrawRow(cx, ref cy, innerW, _keyTeleport, "Teleport", _hasSavedPosition ? "READY" : "EMPTY", _hasSavedPosition, TrainerTheme.On);
+            // In ghost mode the Teleport bind restarts at the ghost start instead.
+            if (_ghostModeActive)
+            {
+                bool ready = _ghostHasStart && _ghostHasEnd;
+                DrawRow(cx, ref cy, innerW, _keyTeleport, "Ghost restart", ready ? "READY" : "EMPTY", ready, TrainerTheme.Ghost);
+            }
+            else
+                DrawRow(cx, ref cy, innerW, _keyTeleport, "Teleport", _hasSavedPosition ? "READY" : "EMPTY", _hasSavedPosition, TrainerTheme.On);
             DrawRow(cx, ref cy, innerW, _keyFly, "Fly mode", _flyModeActive ? "ON" : "OFF", _flyModeActive, TrainerTheme.Fly);
             DrawRow(cx, ref cy, innerW, _keyVel, "Keep velocity", _keepVelocityActive ? "ON" : "OFF", _keepVelocityActive, TrainerTheme.On);
             DrawRow(cx, ref cy, innerW, _keyAngle, "Keep angle", _keepAngleActive ? "ON" : "OFF", _keepAngleActive, TrainerTheme.On);
             DrawRow(cx, ref cy, innerW, _keyRepair, "Auto-repair", _autoRepairActive ? "ON" : "OFF", _autoRepairActive, TrainerTheme.On);
             DrawRow(cx, ref cy, innerW, _keyBeam, "Help beam (solo)", _helpBeamSpActive ? "ON" : "OFF", _helpBeamSpActive, TrainerTheme.On);
+
+            // Ghost section
+            cy += 6f * sc;
+            TrainerTheme.FillRect(new Rect(cx, cy, innerW, 1f), TrainerTheme.Divider);
+            cy += 6f * sc;
+            DrawRow(cx, ref cy, innerW, _keyGhostMode, "Ghost mode", _ghostModeActive ? "ON" : "OFF", _ghostModeActive, TrainerTheme.Ghost);
+            if (_ghostModeActive)
+            {
+                DrawRow(cx, ref cy, innerW, _keyGhostSetStart, "Set start", _ghostHasStart ? "SET" : "EMPTY", _ghostHasStart, TrainerTheme.On);
+                DrawRow(cx, ref cy, innerW, _keyGhostSetEnd, "Set end", _ghostHasEnd ? "SET" : "EMPTY", _ghostHasEnd, TrainerTheme.Warn);
+                DrawRow(cx, ref cy, innerW, _keyGhostRecord, "Record ghost", _ghostRecording ? "REC" : "OFF", _ghostRecording, TrainerTheme.Danger);
+                DrawRow(cx, ref cy, innerW, _keyGhostPlay, "Play ghost", _ghostPlaying ? "ON" : "OFF", _ghostPlaying, TrainerTheme.Ghost);
+                DrawRow(cx, ref cy, innerW, _keyGhostSpectate, "Spectate ghost", _ghostSpectating ? "ON" : "OFF", _ghostSpectating, TrainerTheme.Ghost);
+            }
+            if (_ghostStatus != null)
+            {
+                TrainerTheme.Label(new Rect(cx, cy, innerW, BASE_STATUS_H * sc), _ghostStatus, _styleSmall, TrainerTheme.Ghost);
+                cy += BASE_STATUS_H * sc;
+            }
 
             // Footer: menu shortcut
             cy += 8f * sc;

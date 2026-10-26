@@ -99,7 +99,9 @@ namespace FlippingIsHardTrainer
             var s = TrainerConfig.Settings;
             return new[] { s.SavePosition, s.Teleport, s.ToggleFlyMode,
                            s.ToggleKeepVelocity, s.ToggleKeepAngle, s.ToggleAutoRepair,
-                           s.ToggleHelpBeam, s.OpenBindMenu };
+                           s.ToggleHelpBeam, s.OpenBindMenu,
+                           s.ToggleGhostMode, s.GhostSetStart, s.GhostSetEnd,
+                           s.GhostRecord, s.GhostPlay, s.GhostSpectate };
         }
 
         // True if another bind shares this bind's main key but requires a modifier that is
@@ -182,6 +184,12 @@ namespace FlippingIsHardTrainer
         public bool IsToggleAutoRepairPressed() => CheckBindPressed("Repair", TrainerConfig.Settings.ToggleAutoRepair);
         public bool IsToggleHelpBeamPressed() => CheckBindPressed("Beam", TrainerConfig.Settings.ToggleHelpBeam);
         public bool IsOpenBindMenuPressed() => CheckBindPressed("Bind", TrainerConfig.Settings.OpenBindMenu);
+        public bool IsToggleGhostModePressed() => CheckBindPressed("GhostMode", TrainerConfig.Settings.ToggleGhostMode);
+        public bool IsGhostSetStartPressed() => CheckBindPressed("GhostSetStart", TrainerConfig.Settings.GhostSetStart);
+        public bool IsGhostSetEndPressed() => CheckBindPressed("GhostSetEnd", TrainerConfig.Settings.GhostSetEnd);
+        public bool IsGhostRecordPressed() => CheckBindPressed("GhostRecord", TrainerConfig.Settings.GhostRecord);
+        public bool IsGhostPlayPressed() => CheckBindPressed("GhostPlay", TrainerConfig.Settings.GhostPlay);
+        public bool IsGhostSpectatePressed() => CheckBindPressed("GhostSpectate", TrainerConfig.Settings.GhostSpectate);
 
         // Fly mode movement — held binds from either device (no active-device gate, so you
         // can mix stick + keyboard), plus the gamepad left stick for analog directions.

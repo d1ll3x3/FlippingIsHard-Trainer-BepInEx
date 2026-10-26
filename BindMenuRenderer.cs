@@ -8,8 +8,9 @@ namespace FlippingIsHardTrainer
 {
     public class BindMenuRenderer
     {
-        // The menu's pages, switched with the header tabs (LB / RB on a gamepad).
-        private enum Page { Keybinds, Teleports }
+        // The menu's pages, switched with the header tabs (LB / RB on a gamepad: previous / next).
+        private enum Page { Keybinds, Teleports, Ghost }
+        private static readonly string[] PageNames = { "Keybinds", "Teleports", "Ghost" };
         // One remappable action. Held = movement-style bind (fly directions / turbo): captured
         // as a single key or button, and Shift/Ctrl/Alt are valid keys on their own.
         private sealed class BindAction
@@ -29,12 +30,18 @@ namespace FlippingIsHardTrainer
         private static readonly BindAction[] Actions =
         {
             new BindAction("Save position",    false, s => s.SavePosition),
-            new BindAction("Teleport",         false, s => s.Teleport),
+            new BindAction("Teleport / ghost restart", false, s => s.Teleport),
             new BindAction("Keep velocity",    false, s => s.ToggleKeepVelocity),
             new BindAction("Keep angle",       false, s => s.ToggleKeepAngle),
             new BindAction("Auto-repair",      false, s => s.ToggleAutoRepair),
             new BindAction("Help beam (solo)", false, s => s.ToggleHelpBeam),
             new BindAction("Open this menu",   false, s => s.OpenBindMenu),
+            new BindAction("Ghost mode",       false, s => s.ToggleGhostMode),
+            new BindAction("Set start here",   false, s => s.GhostSetStart),
+            new BindAction("Set end here",     false, s => s.GhostSetEnd),
+            new BindAction("Record / stop",    false, s => s.GhostRecord),
+            new BindAction("Play / stop",      false, s => s.GhostPlay),
+            new BindAction("Spectate / stop",  false, s => s.GhostSpectate),
             new BindAction("Toggle fly mode",  false, s => s.ToggleFlyMode),
             new BindAction("Forward",          true,  s => s.FlyForward),
             new BindAction("Backward",         true,  s => s.FlyBackward),
@@ -44,7 +51,8 @@ namespace FlippingIsHardTrainer
             new BindAction("Down",             true,  s => s.FlyDown),
             new BindAction("Turbo (hold)",     true,  s => s.FlyTurbo),
         };
-        private const int FLY_SECTION_START = 7;
+        private const int GHOST_SECTION_START = 7;
+        private const int FLY_SECTION_START = 13;
 
         // Gamepad navigation items: one per bind row, then HUD Scale, Reset, Cancel, Save.
         private static readonly int NAV_SCALE  = Actions.Length;
@@ -54,7 +62,7 @@ namespace FlippingIsHardTrainer
         private static readonly int NAV_ITEM_COUNT = Actions.Length + 4;
 
         // Layout, in unscaled units (the whole menu is scaled to the screen via GUI.matrix)
-        private const float W          = 640f;
+        private const float W          = 700f;
         private const float PAD        = 22f;
         private const float HEADER_H   = 66f;
         private const float COLS_H     = 26f;
@@ -66,12 +74,18 @@ namespace FlippingIsHardTrainer
         private const float HINT_H     = 24f;
         private const float BUTTON_H   = 36f;
         private static readonly float H =
-            HEADER_H + COLS_H + SECTION_H * 2f + ROW_H * Actions.Length + 12f + SCALE_H + HINT_H + BUTTON_H + PAD;
-        private const float TAB_W      = 104f;
+            HEADER_H + COLS_H + SECTION_H * 3f + ROW_H * Actions.Length + 12f + SCALE_H + HINT_H + BUTTON_H + PAD;
+        private const float TAB_W      = 96f;
         private const float TP_ROW_H   = 28f;
         private const float TP_GAP     = 20f;
+        private const float GH_ROW_H   = 40f;
+
+        // Ghost page gamepad focus: the controls above the list, its rows, then GhostButtons.
+        private const int GH_MODE = 0, GH_SMALLER = 1, GH_BIGGER = 2, GH_FIRST_ROW = 3;
+        private static readonly string[] GhostButtons = { "Play", "Spectate", "Stop", "Export", "Import", "Close" };
 
         private GameObjectFinder _gameObjectFinder;
+        private readonly GhostMode _ghost;
         private List<MonoBehaviour> _disabledScripts = new List<MonoBehaviour>();
 
         private bool _isVisible = false;
@@ -88,6 +102,7 @@ namespace FlippingIsHardTrainer
         private GUIStyle _styleLabel;
         private GUIStyle _styleChip;
         private GUIStyle _styleButton;
+        private GUIStyle _styleRight;
         private bool _stylesReady = false;
 
         private TrainerSettings _tempSettings;
@@ -101,6 +116,12 @@ namespace FlippingIsHardTrainer
         // Set by the Teleports page and carried out by TrainerController once the menu is
         // closed and the player unfrozen: the freeze would pin a teleported player back.
         private TeleportTarget _pendingTeleport;
+        // Same for the Ghost page's Play and Spectate.
+        private Action _pendingGhostAction;
+        // Ghost page: gamepad focus, first list row shown, and how many rows fit.
+        private int _ghFocus = 0;
+        private int _ghTop = 0;
+        private int _ghRows = 1;
 
         // Listening state (-1 = not capturing)
         private int _listeningIndex = -1;
@@ -154,9 +175,18 @@ namespace FlippingIsHardTrainer
             return t;
         }
 
-        public BindMenuRenderer(GameObjectFinder gameObjectFinder)
+        /// <summary>The Play or Spectate picked in the Ghost tab, once; null when there is none.</summary>
+        public Action TakePendingGhostAction()
+        {
+            var a = _pendingGhostAction;
+            _pendingGhostAction = null;
+            return a;
+        }
+
+        public BindMenuRenderer(GameObjectFinder gameObjectFinder, GhostMode ghost)
         {
             _gameObjectFinder = gameObjectFinder;
+            _ghost = ghost;
         }
 
         public void ToggleVisibility()
@@ -185,7 +215,12 @@ namespace FlippingIsHardTrainer
                 _tempSettings = CloneSettings(TrainerConfig.Settings);
                 FinishListening();
                 _needsCentering = true;
+                // The gamepad combo that opened the menu (LB + RB) is still held: it must not
+                // also switch pages.
+                _wasShoulderLeft = _wasShoulderRight = true;
                 if (_page == Page.Teleports) TeleportTargets.Refresh(force: true);
+                if (_page == Page.Ghost) _ghost.Library.Refresh();
+                _ghost.TabOpen = _page == Page.Ghost;
             }
         }
 
@@ -200,6 +235,7 @@ namespace FlippingIsHardTrainer
             _styleLabel         = TrainerTheme.MakeLabel(14);
             _styleChip          = TrainerTheme.MakeLabel(12, FontStyle.Bold, TextAnchor.MiddleCenter);
             _styleButton        = TrainerTheme.MakeLabel(13, FontStyle.Bold, TextAnchor.MiddleCenter);
+            _styleRight         = TrainerTheme.MakeLabel(13, FontStyle.Bold, TextAnchor.MiddleRight);
             _stylesReady = true;
         }
 
@@ -391,17 +427,22 @@ namespace FlippingIsHardTrainer
                 return;
             }
 
-            // LB / RB switch pages (edge-triggered).
+            // LB / RB switch to the previous / next page (edge-triggered).
             bool shoulderLeft  = gp[GamepadButton.LeftShoulder].isPressed;
             bool shoulderRight = gp[GamepadButton.RightShoulder].isPressed;
-            if (shoulderLeft && !_wasShoulderLeft)   SwitchPage(Page.Keybinds);
-            if (shoulderRight && !_wasShoulderRight) SwitchPage(Page.Teleports);
+            if (shoulderLeft && !_wasShoulderLeft && _page > Page.Keybinds)  SwitchPage(_page - 1);
+            if (shoulderRight && !_wasShoulderRight && _page < Page.Ghost)   SwitchPage(_page + 1);
             _wasShoulderLeft  = shoulderLeft;
             _wasShoulderRight = shoulderRight;
 
             if (_page == Page.Teleports)
             {
                 HandleTeleportsNavigation(gp);
+                return;
+            }
+            if (_page == Page.Ghost)
+            {
+                HandleGhostNavigation(gp);
                 return;
             }
 
@@ -465,6 +506,88 @@ namespace FlippingIsHardTrainer
         private static TeleportTarget[] TeleportColumn(int column)
             => column == 0 ? TeleportTargets.Levels : TeleportTargets.Npcs;
 
+        // One list of everything on the Ghost page, top to bottom; D-Pad up/left and
+        // down/right step through it.
+        private void HandleGhostNavigation(Gamepad gp)
+        {
+            bool navUp    = gp.dpad.up.isPressed    || gp.leftStick.y.ReadValue() >  0.7f;
+            bool navDown  = gp.dpad.down.isPressed  || gp.leftStick.y.ReadValue() < -0.7f;
+            bool navLeft  = gp.dpad.left.isPressed  || gp.leftStick.x.ReadValue() < -0.7f;
+            bool navRight = gp.dpad.right.isPressed || gp.leftStick.x.ReadValue() >  0.7f;
+
+            var entries = _ghost.Library.Entries;
+            int count = GH_FIRST_ROW + entries.Count + GhostButtons.Length;
+            if ((navUp && !_wasNavUp) || (navLeft && !_wasNavLeft))       _ghFocus = (_ghFocus - 1 + count) % count;
+            if ((navDown && !_wasNavDown) || (navRight && !_wasNavRight)) _ghFocus = (_ghFocus + 1) % count;
+            _ghFocus = Mathf.Clamp(_ghFocus, 0, count - 1);
+            _wasNavUp    = navUp;
+            _wasNavDown  = navDown;
+            _wasNavLeft  = navLeft;
+            _wasNavRight = navRight;
+
+            // Keep a focused list row in view.
+            int row = _ghFocus - GH_FIRST_ROW;
+            if (row >= 0 && row < entries.Count)
+            {
+                if (row < _ghTop) _ghTop = row;
+                else if (row >= _ghTop + _ghRows) _ghTop = row - _ghRows + 1;
+            }
+
+            if (gp[GamepadButton.South].wasPressedThisFrame)
+                ActivateGhostItem(_ghFocus);
+            else if (gp[GamepadButton.East].wasPressedThisFrame)
+                CloseMenu();
+        }
+
+        // A Ghost page control, by its gamepad focus index (the mouse uses the same indices).
+        private void ActivateGhostItem(int index)
+        {
+            var entries = _ghost.Library.Entries;
+            if (index == GH_MODE) _ghost.ToggleActive();
+            else if (index == GH_SMALLER) _ghost.ResizeEnd(-1f);
+            else if (index == GH_BIGGER) _ghost.ResizeEnd(+1f);
+            else if (index < GH_FIRST_ROW + entries.Count)
+            {
+                // Picking the picked ghost again goes back to the default one.
+                string path = entries[index - GH_FIRST_ROW].Path;
+                _ghost.SelectedPath = _ghost.SelectedPath == path ? null : path;
+            }
+            else
+                ActivateGhostButton(index - GH_FIRST_ROW - entries.Count);
+        }
+
+        private void ActivateGhostButton(int button)
+        {
+            var target = _ghost.TargetEntry();
+            switch (GhostButtons[button])
+            {
+                case "Play":
+                case "Spectate":
+                    if (target == null)
+                    {
+                        _ghost.Notify("No ghosts yet: record one first", true);
+                        break;
+                    }
+                    bool spectate = GhostButtons[button] == "Spectate";
+                    _pendingGhostAction = spectate ? () => _ghost.Spectate(target) : () => _ghost.Play(target);
+                    CloseMenu();
+                    break;
+                case "Stop":
+                    _ghost.StopPlayback();
+                    break;
+                case "Export":
+                    if (target == null) _ghost.Notify("No ghost to export yet", true);
+                    else _ghost.Export(target);
+                    break;
+                case "Import":
+                    _ghost.Import();
+                    break;
+                case "Close":
+                    CloseMenu();
+                    break;
+            }
+        }
+
         private void SwitchPage(Page page)
         {
             if (_page == page) return;
@@ -473,6 +596,8 @@ namespace FlippingIsHardTrainer
             // Rebuilt on opening: a list built while the level was still spawning its
             // objects could be missing some.
             if (page == Page.Teleports) TeleportTargets.Refresh(force: true);
+            if (page == Page.Ghost) _ghost.Library.Refresh();
+            _ghost.TabOpen = page == Page.Ghost;
         }
 
         private void PickTeleport(TeleportTarget target)
@@ -599,6 +724,12 @@ namespace FlippingIsHardTrainer
                 ToggleAutoRepair   = src.ToggleAutoRepair.Clone(),
                 ToggleHelpBeam     = src.ToggleHelpBeam.Clone(),
                 OpenBindMenu       = src.OpenBindMenu.Clone(),
+                ToggleGhostMode    = src.ToggleGhostMode.Clone(),
+                GhostSetStart      = src.GhostSetStart.Clone(),
+                GhostSetEnd        = src.GhostSetEnd.Clone(),
+                GhostRecord        = src.GhostRecord.Clone(),
+                GhostPlay          = src.GhostPlay.Clone(),
+                GhostSpectate      = src.GhostSpectate.Clone(),
                 FlyForward         = src.FlyForward.Clone(),
                 FlyBackward        = src.FlyBackward.Clone(),
                 FlyLeft            = src.FlyLeft.Clone(),
@@ -630,30 +761,41 @@ namespace FlippingIsHardTrainer
             TrainerTheme.DrawPanel(new Rect(px, py, W, H), TrainerTheme.Panel);
 
             // ── Header ───────────────────────────────────────────────────
-            bool teleports = _page == Page.Teleports;
-            TrainerTheme.Fill(new Rect(px + PAD, py + 18f, 4f, 30f), TrainerTheme.Accent, true);
-            TrainerTheme.Label(new Rect(px + PAD + 14f, py + 12f, 240f, 26f), teleports ? "Teleports" : "Keybinds", _styleTitle, TrainerTheme.Text);
-            TrainerTheme.Label(new Rect(px + PAD + 14f, py + 37f, W - PAD * 2f - TAB_W * 2f - 60f, 18f),
-                teleports ? "Click a level or an NPC to go there" : "Click a binding and press a key or button  ·  Right-click clears it",
-                _styleSubtitle, TrainerTheme.TextDim);
-
             // Page tabs, left of the close button.
-            float tabX = px + W - PAD - 30f - 12f - TAB_W * 2f - 6f;
-            if (Button(new Rect(tabX, py + 18f, TAB_W, 30f), gamepadActive ? (ps ? "L1  Keybinds" : "LB  Keybinds") : "Keybinds",
-                    !teleports, false, TrainerTheme.Accent))
-                SwitchPage(Page.Keybinds);
-            if (Button(new Rect(tabX + TAB_W + 6f, py + 18f, TAB_W, 30f), gamepadActive ? (ps ? "Teleports  R1" : "Teleports  RB") : "Teleports",
-                    teleports, false, TrainerTheme.Accent))
-                SwitchPage(Page.Teleports);
+            float tabX = px + W - PAD - 30f - 12f - TAB_W * PageNames.Length - 6f * (PageNames.Length - 1);
+            string subtitle = _page switch
+            {
+                Page.Teleports => "Click a level or an NPC to go there",
+                Page.Ghost     => "Start, end and your recorded ghosts",
+                _              => "Click a binding, press a key  ·  Right-click clears",
+            };
+            TrainerTheme.Fill(new Rect(px + PAD, py + 18f, 4f, 30f), TrainerTheme.Accent, true);
+            TrainerTheme.Label(new Rect(px + PAD + 14f, py + 12f, 240f, 26f), PageNames[(int)_page], _styleTitle, TrainerTheme.Text);
+            TrainerTheme.Label(new Rect(px + PAD + 14f, py + 37f, tabX - px - PAD - 24f, 18f), subtitle, _styleSubtitle, TrainerTheme.TextDim);
+
+            for (int i = 0; i < PageNames.Length; i++)
+            {
+                // On a gamepad, the neighbouring tabs show the shoulder button that opens them.
+                string label = PageNames[i];
+                if (gamepadActive && i == (int)_page - 1) label = (ps ? "L1  " : "LB  ") + label;
+                if (gamepadActive && i == (int)_page + 1) label += ps ? "  R1" : "  RB";
+                if (Button(new Rect(tabX + i * (TAB_W + 6f), py + 18f, TAB_W, 30f), label, i == (int)_page, false, TrainerTheme.Accent))
+                    SwitchPage((Page)i);
+            }
 
             if (Button(CloseRect(), "X", false, false, TrainerTheme.Danger))
                 CloseMenu();
 
             TrainerTheme.FillRect(new Rect(px, py + HEADER_H, W, 1f), TrainerTheme.Divider);
 
-            if (teleports)
+            if (_page == Page.Teleports)
             {
                 DrawTeleportsPage(px, py, gamepadActive, ps);
+                return;
+            }
+            if (_page == Page.Ghost)
+            {
+                DrawGhostPage(px, py, gamepadActive, ps);
                 return;
             }
 
@@ -669,10 +811,11 @@ namespace FlippingIsHardTrainer
             // ── Bind rows ────────────────────────────────────────────────
             for (int i = 0; i < Actions.Length; i++)
             {
-                if (i == 0 || i == FLY_SECTION_START)
+                if (i == 0 || i == GHOST_SECTION_START || i == FLY_SECTION_START)
                 {
-                    TrainerTheme.Label(new Rect(px + PAD, y + 10f, 300f, 18f),
-                        i == 0 ? "GENERAL" : "FLY MODE", _styleCaption, i == 0 ? TrainerTheme.Accent : TrainerTheme.Fly);
+                    string section = i == 0 ? "GENERAL" : i == GHOST_SECTION_START ? "GHOST" : "FLY MODE";
+                    Color color = i == 0 ? TrainerTheme.Accent : i == GHOST_SECTION_START ? TrainerTheme.Ghost : TrainerTheme.Fly;
+                    TrainerTheme.Label(new Rect(px + PAD, y + 10f, 300f, 18f), section, _styleCaption, color);
                     y += SECTION_H;
                 }
                 DrawBindRow(i, px, y, gamepadActive);
@@ -763,6 +906,129 @@ namespace FlippingIsHardTrainer
                     PickTeleport(targets[i]);
                 y += TP_ROW_H;
             }
+        }
+
+        // Ghost mode with its course and end zone size, then every ghost: a click picks the one Play,
+        // Spectate, Export and the attempts use (the PB unless one is picked).
+        private void DrawGhostPage(float px, float py, bool gamepadActive, bool ps)
+        {
+            var entries = _ghost.Library.Entries;
+            if (_ghost.LastImportedPath != null)
+            {
+                // Selected once; the import result is not re-applied every frame.
+                _ghost.SelectedPath = _ghost.LastImportedPath;
+                _ghost.LastImportedPath = null;
+                for (int i = 0; i < entries.Count; i++)
+                    if (entries[i].Path == _ghost.SelectedPath) _ghTop = i;
+            }
+
+            float x = px + PAD;
+            float w = W - PAD * 2f;
+            float y = py + HEADER_H + 14f;
+            var course = _ghost.Course;
+
+            // ── Ghost mode, start and end ────────────────────────────────
+            TrainerTheme.Label(new Rect(x, y, w, 18f), "GHOST MODE", _styleCaption, TrainerTheme.Ghost);
+            y += 24f;
+            if (Button(new Rect(x, y, 170f, 30f), _ghost.Active ? "Ghost mode: ON" : "Ghost mode: OFF",
+                    _ghost.Active, gamepadActive && _ghFocus == GH_MODE, TrainerTheme.Ghost))
+                ActivateGhostItem(GH_MODE);
+            TrainerTheme.Label(new Rect(x + 184f, y, w - 184f, 30f),
+                $"Start {(course.HasStart ? "set" : "—")}  ·  End {(course.HasEnd ? "set" : "—")}  ·  {_ghost.PbText()}",
+                _styleLabel, TrainerTheme.TextDim);
+            y += 38f;
+
+            // The start and the end are set with their binds while playing, ghost mode on.
+            var s = TrainerConfig.Settings;
+            var device = gamepadActive ? InputDeviceType.Gamepad : InputDeviceType.Keyboard;
+            TrainerTheme.Label(new Rect(x, y, w - 210f, 30f),
+                $"In ghost mode: {s.GhostSetStart.ToString(device, ps)} sets the start, {s.GhostSetEnd.ToString(device, ps)} the end",
+                _styleSubtitle, TrainerTheme.TextDim);
+            TrainerTheme.Label(new Rect(x + w - 74f - 130f, y, 124f, 30f), $"End zone {course.EndSize:0} m", _styleRight, TrainerTheme.Text);
+            if (Button(new Rect(x + w - 74f, y, 34f, 30f), "-", false, gamepadActive && _ghFocus == GH_SMALLER, TrainerTheme.Accent))
+                ActivateGhostItem(GH_SMALLER);
+            if (Button(new Rect(x + w - 34f, y, 34f, 30f), "+", false, gamepadActive && _ghFocus == GH_BIGGER, TrainerTheme.Accent))
+                ActivateGhostItem(GH_BIGGER);
+            y += 42f;
+
+            // ── Ghost list ───────────────────────────────────────────────
+            TrainerTheme.Label(new Rect(x, y, w, 18f), $"GHOSTS ({entries.Count})", _styleCaption, TrainerTheme.Accent);
+            y += 24f;
+
+            // Bottom up: Close, hint, the ghost in use, the list's buttons; the list takes the rest.
+            float closeY = py + H - PAD - BUTTON_H;
+            float hintY = closeY - HINT_H - 4f;
+            float targetY = hintY - 20f;
+            float buttonsY = targetY - 38f;
+            _ghRows = Mathf.Max(1, Mathf.FloorToInt((buttonsY - 8f - y) / GH_ROW_H));
+            var listRect = new Rect(x, y, w, _ghRows * GH_ROW_H);
+            TrainerTheme.Fill(listRect, TrainerTheme.Surface, true);
+            ScrollGhostList(listRect, entries.Count);
+            if (entries.Count == 0)
+                TrainerTheme.Label(new Rect(x + 10f, y + 8f, w - 20f, 22f),
+                    "No ghosts yet: record one, finish an attempt or import a file.", _styleSubtitle, TrainerTheme.TextDim);
+
+            for (int i = 0; i < _ghRows && _ghTop + i < entries.Count; i++)
+            {
+                int index = _ghTop + i;
+                var e = entries[index];
+                var row = new Rect(listRect.x + 2f, y + i * GH_ROW_H + 2f, listRect.width - 4f, GH_ROW_H - 4f);
+                if (e.Path == _ghost.SelectedPath)
+                {
+                    TrainerTheme.Fill(row, new Color(TrainerTheme.Ghost.r, TrainerTheme.Ghost.g, TrainerTheme.Ghost.b, 0.16f), true);
+                    TrainerTheme.Fill(new Rect(row.x, row.y + 6f, 3f, row.height - 12f), TrainerTheme.Ghost, true);
+                }
+                DrawRowBackground(row, gamepadActive && _ghFocus == GH_FIRST_ROW + index);
+
+                var h = e.Header;
+                TrainerTheme.Label(new Rect(row.x + 10f, row.y + 1f, row.width - 120f, 19f), e.Title, _styleLabel, TrainerTheme.Text);
+                TrainerTheme.Label(new Rect(row.xMax - 110f, row.y + 1f, 100f, 19f), GhostMode.FormatTime(e.Time), _styleRight, TrainerTheme.Text);
+                TrainerTheme.Label(new Rect(row.x + 10f, row.y + 19f, row.width - 20f, 16f),
+                    $"{h.MapId}  ·  {h.Difficulty}  ·  {h.RecordedAtUtc.ToLocalTime():dd/MM HH:mm}", _styleSubtitle, TrainerTheme.TextFaint);
+                if (Clicked(row, 0))
+                    ActivateGhostItem(GH_FIRST_ROW + index);
+            }
+
+            // ── Buttons ──────────────────────────────────────────────────
+            // Play, Spectate, Stop on the left; Export, Import on the right; Close at the bottom.
+            int firstButton = GH_FIRST_ROW + entries.Count;
+            for (int b = 0; b < GhostButtons.Length - 1; b++)
+            {
+                float bx = b < 3 ? x + b * 106f : x + w - (5 - b) * 106f + 6f;
+                if (Button(new Rect(bx, buttonsY, 100f, 30f), GhostButtons[b], false, gamepadActive && _ghFocus == firstButton + b, TrainerTheme.Ghost))
+                    ActivateGhostButton(b);
+            }
+
+            var target = _ghost.TargetEntry();
+            string targetText = target == null
+                ? "No ghost to play yet"
+                : $"{(target.Path == _ghost.SelectedPath ? "Picked" : "Default")}: {target.Title}  ({GhostMode.FormatTime(target.Time)})";
+            TrainerTheme.Label(new Rect(x, targetY, w, 20f), targetText, _styleSubtitle, TrainerTheme.Ghost);
+
+            string hint;
+            if (_ghost.HasRecentMessage)
+                hint = _ghost.Message;
+            else if (gamepadActive)
+                hint = $"D-Pad navigate  ·  {(ps ? "Cross" : "A")} select  ·  {(ps ? "Circle" : "B")} close";
+            else
+                hint = "Click a ghost to pick it, again to go back to the PB  ·  Play and Spectate close the menu";
+            TrainerTheme.Label(new Rect(x, hintY, w, HINT_H), hint, _styleSubtitle, TrainerTheme.TextFaint);
+
+            int close = firstButton + GhostButtons.Length - 1;
+            if (Button(new Rect(px + W - PAD - 130f, closeY, 130f, BUTTON_H), "Close", false, gamepadActive && _ghFocus == close, TrainerTheme.Accent))
+                ActivateGhostButton(GhostButtons.Length - 1);
+        }
+
+        // Mouse wheel over the list, once per frame (the Repaint pass). Legacy Input: IMGUI's
+        // ScrollWheel events never fire in this game.
+        private void ScrollGhostList(Rect listRect, int count)
+        {
+            if (Event.current.type == EventType.Repaint && listRect.Contains(MouseGui()))
+            {
+                float scroll = Input.mouseScrollDelta.y;
+                if (scroll != 0f) _ghTop -= Math.Sign(scroll);
+            }
+            _ghTop = Mathf.Clamp(_ghTop, 0, Mathf.Max(0, count - _ghRows));
         }
 
         private void DrawBindRow(int index, float px, float y, bool gamepadActive)
@@ -863,6 +1129,7 @@ namespace FlippingIsHardTrainer
             IsVisibleGlobally = false;
             _dragging = false;
             FinishListening();
+            _ghost.TabOpen = false;
 
             // Restore disabled scripts
             EnableGameScripts();
@@ -886,6 +1153,14 @@ namespace FlippingIsHardTrainer
         {
             _disabledScripts.Clear();
 
+            // Camera scripts are never touched. Under IL2CPP a game component only shows its
+            // real type here when the trainer already wrapped it as that type (the interop
+            // reuses cached wrappers): the Cinemachine camera and the CameraManager are, after
+            // a teleport, a ghost restart or a Set start. Disabling that camera made Cinemachine
+            // cut to another one in the level, so opening the menu sent the view somewhere
+            // random. Freezing the player and disabling the keyboard and mouse already stop
+            // any interaction.
+
             // 1. Disable InputSystem globally to stop Pause menus and interactions
             var allMonos = UnityEngine.Object.FindObjectsOfType<MonoBehaviour>();
             foreach (var comp in allMonos)
@@ -897,9 +1172,7 @@ namespace FlippingIsHardTrainer
 
                 if (ns.StartsWith("UnityEngine.InputSystem") ||
                     name.Contains("input") ||
-                    name.Contains("pause") ||
-                    name.Contains("camera") ||
-                    name.Contains("look"))
+                    name.Contains("pause"))
                 {
                     if (ns != "FlippingIsHardTrainer")
                     {
@@ -914,26 +1187,6 @@ namespace FlippingIsHardTrainer
             if (player != null)
             {
                 foreach (var comp in player.GetComponents<MonoBehaviour>())
-                {
-                    if (comp != null && comp.enabled && !(comp.GetType().Namespace ?? "").StartsWith("UnityEngine"))
-                    {
-                        if ((comp.GetType().Namespace ?? "") != "FlippingIsHardTrainer")
-                        {
-                            comp.enabled = false;
-                            if (!_disabledScripts.Contains(comp))
-                            {
-                                _disabledScripts.Add(comp);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 3. Disable custom camera scripts
-            var camera = _gameObjectFinder.FindCameraTransform();
-            if (camera != null)
-            {
-                foreach (var comp in camera.GetComponents<MonoBehaviour>())
                 {
                     if (comp != null && comp.enabled && !(comp.GetType().Namespace ?? "").StartsWith("UnityEngine"))
                     {

@@ -22,6 +22,7 @@ namespace FlippingIsHardTrainer
         public static readonly Color FlySoft      = new Color(0.70f,  0.58f,  1f,     0.14f);
         public static readonly Color On           = new Color(0.38f,  0.88f,  0.58f,  1f);
         public static readonly Color OnSoft       = new Color(0.38f,  0.88f,  0.58f,  0.16f);
+        public static readonly Color Ghost        = new Color(1f,     0.55f,  0.80f,  1f);
         public static readonly Color Warn         = new Color(1f,     0.75f,  0.33f,  1f);
         public static readonly Color WarnSoft     = new Color(1f,     0.75f,  0.33f,  0.18f);
         public static readonly Color Danger       = new Color(0.96f,  0.42f,  0.42f,  1f);

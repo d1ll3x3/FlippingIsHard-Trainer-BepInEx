@@ -8,7 +8,7 @@ using System;
 
 namespace FlippingIsHardTrainer
 {
-    [BepInPlugin("com.flippingishard.trainer", "Flipping is Hard Trainer", "1.7.0")]
+    [BepInPlugin("com.flippingishard.trainer", "Flipping is Hard Trainer", "1.8.0")]
     public class TrainerPlugin : BasePlugin
     {
         internal static ManualLogSource Logger { get; private set; }
@@ -87,10 +87,29 @@ namespace FlippingIsHardTrainer
             }
         }
 
+        // Ghost recording samples the phone on the physics tick.
+        void FixedUpdate()
+        {
+            if (_initialized)
+                _controller?.FixedUpdate();
+        }
+
+        // Ghosts are posed after the game moved the player this frame.
+        void LateUpdate()
+        {
+            if (_initialized)
+                _controller?.LateUpdate();
+        }
+
         void OnGUI()
         {
             if (_initialized)
                 _controller?.OnGUI();
+        }
+
+        void OnDestroy()
+        {
+            _controller?.Shutdown();
         }
 
         private void TryInitialize()

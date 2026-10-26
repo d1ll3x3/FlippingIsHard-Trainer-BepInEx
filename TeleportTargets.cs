@@ -189,9 +189,8 @@ namespace FlippingIsHardTrainer
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
 
-                var cam = player.GameRefs?.CameraManager;
-                cam?.SyncPosAfterTeleport(target.Position);
-                var orbital = cam?.MainCinemachineCamera?.GetComponent<Unity.Cinemachine.CinemachineOrbitalFollow>();
+                player.GameRefs?.CameraManager?.SyncPosAfterTeleport(target.Position);
+                var orbital = Orbital(player);
                 if (orbital != null)
                 {
                     var axis = orbital.HorizontalAxis;
@@ -207,6 +206,16 @@ namespace FlippingIsHardTrainer
                 return false;
             }
         }
+
+        /// <summary>The camera's orbit yaw in degrees, or the phone's heading without one.</summary>
+        public static float CameraYaw(PlayerRef player)
+        {
+            var orbital = Orbital(player);
+            return orbital != null ? orbital.HorizontalAxis.Value : player.Rb.rotation.eulerAngles.y;
+        }
+
+        private static Unity.Cinemachine.CinemachineOrbitalFollow Orbital(PlayerRef player)
+            => player.GameRefs?.CameraManager?.MainCinemachineCamera?.GetComponent<Unity.Cinemachine.CinemachineOrbitalFollow>();
 
         private static List<Zone> FindZones()
         {
@@ -302,8 +311,9 @@ namespace FlippingIsHardTrainer
         }
 
         // The floor under (or just above) a point, with the phone resting on it; the point
-        // itself when there is none within reach.
-        private static Vector3 OnFloor(Vector3 point)
+        // itself when there is none within reach. Also puts a ghost mode start set while
+        // flying on the floor.
+        public static Vector3 OnFloor(Vector3 point)
         {
             return Physics.Raycast(point + Vector3.up * SearchAbove, Vector3.down, out RaycastHit hit,
                        SearchAbove + SearchDepth, GroundMask, QueryTriggerInteraction.Ignore)
