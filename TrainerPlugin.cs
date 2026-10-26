@@ -8,7 +8,7 @@ using System;
 
 namespace FlippingIsHardTrainer
 {
-    [BepInPlugin("com.flippingishard.trainer", "Flipping is Hard Trainer", "1.8.0")]
+    [BepInPlugin("com.flippingishard.trainer", "Flipping is Hard Trainer", "1.8.1")]
     public class TrainerPlugin : BasePlugin
     {
         internal static ManualLogSource Logger { get; private set; }

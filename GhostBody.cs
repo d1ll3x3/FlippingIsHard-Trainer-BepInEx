@@ -157,6 +157,10 @@ namespace FlippingIsHardTrainer
                 var mats = new Material[shared.Length];
                 for (int i = 0; i < mats.Length; i++) mats[i] = _material;
                 renderer.sharedMaterials = mats;
+                // MaterialHandlerOptimized leaves a property block on the casing's renderers
+                // (not the screen's) and the clone keeps it, overriding the ghost material:
+                // only the screen showed. Cleared the way the game clears it.
+                renderer.SetPropertyBlock(null);
                 renderer.shadowCastingMode = ShadowCastingMode.Off;
                 renderer.receiveShadows = false;
             }
