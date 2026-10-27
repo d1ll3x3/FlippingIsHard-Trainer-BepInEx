@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace FlippingIsHardTrainer
@@ -44,6 +46,12 @@ namespace FlippingIsHardTrainer
         private static Font _font;
         private static bool _fontFailed;
 
+        // Segoe UI only exists on Windows. Under Proton/Wine, CreateDynamicFontFromOSFont with a
+        // missing name does not throw: it returns a font with no glyphs and every label renders
+        // blank. So use the first font that is really installed (the others are the usual ones on
+        // Linux and in Proton prefixes) and fall back to Unity's built-in font if none is.
+        private static readonly string[] PreferredFonts = { "Segoe UI", "Arial", "Liberation Sans", "DejaVu Sans", "Noto Sans" };
+
         public static Font Font
         {
             get
@@ -51,8 +59,18 @@ namespace FlippingIsHardTrainer
                 if (_font != null || _fontFailed) return _font;
                 try
                 {
-                    _font = Font.CreateDynamicFontFromOSFont("Segoe UI", 16);
-                    if (_font != null) _font.hideFlags = HideFlags.HideAndDontSave;
+                    var installed = new HashSet<string>(Font.GetOSInstalledFontNames(), StringComparer.OrdinalIgnoreCase);
+                    var name = PreferredFonts.FirstOrDefault(installed.Contains);
+                    if (name != null)
+                    {
+                        _font = Font.CreateDynamicFontFromOSFont(name, 16);
+                        if (_font != null) _font.hideFlags = HideFlags.HideAndDontSave;
+                        TrainerPlugin.Logger.LogInfo($"[UI] Using OS font '{name}'.");
+                    }
+                    else
+                    {
+                        TrainerPlugin.Logger.LogWarning("[UI] None of the preferred OS fonts is installed; using Unity's default.");
+                    }
                 }
                 catch (Exception ex)
                 {
