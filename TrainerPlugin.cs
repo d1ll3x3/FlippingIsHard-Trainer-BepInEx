@@ -72,6 +72,16 @@ namespace FlippingIsHardTrainer
 
         void Update()
         {
+            // From the start, not only once the player is found: no world loads unblocked.
+            try
+            {
+                AchievementBlocker.Update();
+            }
+            catch (Exception ex)
+            {
+                TrainerPlugin.Logger.LogError($"Error blocking achievements: {ex}");
+            }
+
             if (_initialized)
             {
                 _controller?.Update();

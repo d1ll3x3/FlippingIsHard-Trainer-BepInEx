@@ -27,6 +27,7 @@ A highly optimized Unity IL2CPP BepInEx plugin for "Flipping is Hard Demo" that 
   - The Ghost tab lists every ghost (PB, recordings, imports) with **Export** / **Import** through the Windows file dialog. Files use the same `.fihghost` format as [FIH Ghost](https://github.com/d1ll3x3/FIH_Ghost), so ghosts move between both mods.
   - Ghosts are saved in a `Ghosts` folder next to the trainer's `.dll`. Moving the start or the end keeps the old PB in the list as a recording, and the next finished attempt is the new PB.
 - **🗺️ Level & NPC Teleports** - The menu's **Teleports** tab (`LB`/`RB` on a gamepad switch tabs) takes you to the start of any story level or in front of any NPC; L10 and the Narrator land in front of the boss door. Same targets as [FIH Ghost](https://github.com/d1ll3x3/FIH_Ghost). Story map only.
+- **🏆 No Achievements While Loaded** - Fly, teleports and the rest are advantages, so achievements (and the stats behind them) can't be earned while the trainer is loaded. It uses the game's own achievement block, the one Crowd Control runs use, with no achievement allowed. Remove the trainer to earn them again.
 - **🎮 Full Gamepad Support** - Xbox & PlayStation controllers, with the overlay/menu auto-switching to the device you're using.
 - **📍 Real-time Telemetry** - HUD in the top-right corner showing current `SPEED`, `HEIGHT`, and `XYZ` position
 - **🎮 Smart Overlay** - Clean, modern HUD showing your binds, active toggles, and saved position state
@@ -103,6 +104,7 @@ Trainer/
 ├── OverlayRenderer.cs           # HUD Renderer
 ├── PhoneRepair.cs               # Phone auto-repair via the game's destruction FSM
 ├── HelpBeamUnlock.cs            # Harmony patch that lets the help beam spawn in solo play
+├── AchievementBlocker.cs        # Keeps the game's achievement block on while the trainer is loaded
 ├── TrainerTheme.cs              # Shared UI palette, rounded shapes and font
 └── README.md                    # This file
 ```
