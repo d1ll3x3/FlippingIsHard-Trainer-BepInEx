@@ -37,6 +37,7 @@ namespace FlippingIsHardTrainer
         private OverlayRenderer _overlayRenderer;
         private BindMenuRenderer _bindMenuRenderer;
         private GhostMode _ghostMode;
+        private readonly TrainerLobbyUsage _lobbyUsage = new TrainerLobbyUsage();
 
         // Current state for overlay
         private Vector3 _currentPosition = Vector3.zero;
@@ -93,6 +94,8 @@ namespace FlippingIsHardTrainer
             {
                 if (!enabled) return;
 
+                _lobbyUsage.Update();
+
                 // Update input handler
                 _inputHandler.Update();
 
@@ -142,7 +145,8 @@ namespace FlippingIsHardTrainer
                 if (pendingTeleport != null)
                 {
                     _ghostMode.CancelAttempt();
-                    TeleportTargets.Teleport(pendingTeleport);
+                    if (TeleportTargets.Teleport(pendingTeleport))
+                        _lobbyUsage.RecordUse();
                 }
 
                 // Same for a ghost picked in the Ghost tab to play or spectate: spectating
@@ -403,7 +407,10 @@ namespace FlippingIsHardTrainer
                 ToggleFlyMode();
 
             if (_ghostMode.Restart())
+            {
+                _lobbyUsage.RecordUse();
                 RepairIfEnabled();
+            }
         }
         
         private void SavePosition()
@@ -439,6 +446,7 @@ namespace FlippingIsHardTrainer
                     }
 
                     _hasSavedPosition = true;
+                    _lobbyUsage.RecordUse();
                     
                     TrainerPlugin.Logger.LogInfo($"Position saved: {_savedPosition}");
                     _overlayRenderer.SetPositionSaved(true);
@@ -515,6 +523,7 @@ namespace FlippingIsHardTrainer
                     
                     playerTransform.position = _savedPosition;
                     playerTransform.rotation = _savedRotation;
+                    _lobbyUsage.RecordUse();
 
                     RepairIfEnabled();
 
@@ -603,6 +612,7 @@ namespace FlippingIsHardTrainer
                         rb.isKinematic = true;
                         rb.useGravity = false;
                         rb.detectCollisions = false;
+                        _lobbyUsage.RecordUse();
                     }
                     else
                     {
