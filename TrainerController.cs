@@ -212,6 +212,15 @@ namespace FlippingIsHardTrainer
             try
             {
                 _ghostMode?.Shutdown();
+                if (_bindMenuRenderer?.IsVisible == true)
+                {
+                    _bindMenuRenderer.ToggleVisibility();
+                    HandleMenuFreeze();
+                }
+                if (_flyModeActive)
+                    ToggleFlyMode();
+                _ghostMode?.Disable();
+                RestoreNativeFly();
             }
             catch (Exception ex)
             {
@@ -590,6 +599,16 @@ namespace FlippingIsHardTrainer
         {
             try
             {
+                if (!_flyModeActive && !TeleportTargets.IsPlayerReady())
+                    return;
+
+                if (!_flyModeActive)
+                    _gameObjectFinder.FindPlayer();
+
+                var rb = _gameObjectFinder.GetCachedPlayerRigidbody();
+                if (!_flyModeActive && rb == null)
+                    return;
+
                 _flyModeActive = !_flyModeActive;
                 _overlayRenderer.SetFlyModeActive(_flyModeActive);
 
@@ -597,7 +616,6 @@ namespace FlippingIsHardTrainer
                 if (_flyModeActive)
                     _ghostMode.CancelAttempt();
 
-                var rb = _gameObjectFinder.GetCachedPlayerRigidbody();
                 if (rb != null)
                 {
                     if (_flyModeActive)

@@ -4,6 +4,7 @@ using BepInEx.Unity.IL2CPP;
 using HarmonyLib;
 using Il2CppInterop.Runtime.Injection;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using System;
 
 namespace FlippingIsHardTrainer
@@ -58,6 +59,8 @@ namespace FlippingIsHardTrainer
         public TrainerBehaviour(IntPtr ptr) : base(ptr) { }
 
         private TrainerController _controller;
+        private GameObject _gameplayPlayer;
+        private int _gameplayScene;
         private GameObjectFinder _finder;
         private bool _initialized = false;
         private float _timer = 0f;
@@ -84,8 +87,18 @@ namespace FlippingIsHardTrainer
 
             if (_initialized)
             {
-                _controller?.Update();
-                return;
+                if (IsGameplayReady())
+                {
+                    _controller.Update();
+                    return;
+                }
+
+                _initialized = false;
+                _controller.Shutdown();
+                _controller = null;
+                _finder = new GameObjectFinder();
+                _timer = 0f;
+                _nextAttempt = RETRY_INTERVAL;
             }
 
             _timer += Time.deltaTime;
@@ -97,23 +110,30 @@ namespace FlippingIsHardTrainer
             }
         }
 
+        private bool IsGameplayReady()
+        {
+            return _gameplayPlayer != null && _gameplayPlayer.activeInHierarchy &&
+                SceneManager.GetActiveScene().handle == _gameplayScene &&
+                TeleportTargets.IsPlayerReady();
+        }
+
         // Ghost recording samples the phone on the physics tick.
         void FixedUpdate()
         {
-            if (_initialized)
+            if (_initialized && IsGameplayReady())
                 _controller?.FixedUpdate();
         }
 
         // Ghosts are posed after the game moved the player this frame.
         void LateUpdate()
         {
-            if (_initialized)
+            if (_initialized && IsGameplayReady())
                 _controller?.LateUpdate();
         }
 
         void OnGUI()
         {
-            if (_initialized)
+            if (_initialized && IsGameplayReady())
                 _controller?.OnGUI();
         }
 
@@ -129,7 +149,8 @@ namespace FlippingIsHardTrainer
                 var player = _finder.FindPlayer();
                 var camera = _finder.FindCamera();
 
-                if (player != null && camera != null)
+                if (player != null && player != _gameplayPlayer && camera != null &&
+                    TeleportTargets.IsPlayerReady())
                 {
                     TrainerPlugin.Logger.LogInfo($"Found player: {player.name}");
                     TrainerPlugin.Logger.LogInfo($"Found camera: {camera.name}");
@@ -138,7 +159,9 @@ namespace FlippingIsHardTrainer
                     _controller.enabled = true;
                     _controller.Initialize();
 
-                    _initialized = true;
+                    _gameplayPlayer = player;
+                    _gameplayScene = SceneManager.GetActiveScene().handle;
+                    _initialized = _controller.enabled;
                     TrainerPlugin.Logger.LogInfo("Trainer initialized successfully!");
                 }
                 else
