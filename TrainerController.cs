@@ -206,8 +206,12 @@ namespace FlippingIsHardTrainer
             }
         }
 
-        /// <summary>Called when the game is closing: a hand-made ghost recording is saved.</summary>
-        public void Shutdown()
+        /// <summary>
+        /// Called when gameplay goes away (level change, main menu, game closing): a hand-made
+        /// ghost recording is saved and whatever touches the player is turned off. The saved
+        /// position and the toggles stay, for when gameplay comes back.
+        /// </summary>
+        public void Suspend()
         {
             try
             {
@@ -221,10 +225,14 @@ namespace FlippingIsHardTrainer
                     ToggleFlyMode();
                 _ghostMode?.Disable();
                 RestoreNativeFly();
+                // Picked in the menu but not run yet: it must not fire when gameplay returns.
+                _bindMenuRenderer?.TakePendingTeleport();
+                _bindMenuRenderer?.TakePendingGhostAction();
+                _gameObjectFinder?.ClearCache();
             }
             catch (Exception ex)
             {
-                TrainerPlugin.Logger.LogError($"Error in TrainerController.Shutdown: {ex}");
+                TrainerPlugin.Logger.LogError($"Error in TrainerController.Suspend: {ex}");
             }
         }
 

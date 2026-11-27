@@ -94,8 +94,7 @@ namespace FlippingIsHardTrainer
                 }
 
                 _initialized = false;
-                _controller.Shutdown();
-                _controller = null;
+                _controller.Suspend();
                 _finder = new GameObjectFinder();
                 _timer = 0f;
                 _nextAttempt = RETRY_INTERVAL;
@@ -139,7 +138,7 @@ namespace FlippingIsHardTrainer
 
         void OnDestroy()
         {
-            _controller?.Shutdown();
+            _controller?.Suspend();
         }
 
         private void TryInitialize()
@@ -149,20 +148,24 @@ namespace FlippingIsHardTrainer
                 var player = _finder.FindPlayer();
                 var camera = _finder.FindCamera();
 
-                if (player != null && player != _gameplayPlayer && camera != null &&
-                    TeleportTargets.IsPlayerReady())
+                if (player != null && camera != null && TeleportTargets.IsPlayerReady())
                 {
                     TrainerPlugin.Logger.LogInfo($"Found player: {player.name}");
                     TrainerPlugin.Logger.LogInfo($"Found camera: {camera.name}");
 
-                    _controller = new TrainerController();
-                    _controller.enabled = true;
-                    _controller.Initialize();
+                    // Created once: it keeps the saved position across gameplay transitions.
+                    if (_controller == null)
+                    {
+                        var controller = new TrainerController { enabled = true };
+                        controller.Initialize();
+                        if (!controller.enabled) return; // Initialize logged why; retried later
+                        _controller = controller;
+                    }
 
                     _gameplayPlayer = player;
                     _gameplayScene = SceneManager.GetActiveScene().handle;
-                    _initialized = _controller.enabled;
-                    TrainerPlugin.Logger.LogInfo("Trainer initialized successfully!");
+                    _initialized = true;
+                    TrainerPlugin.Logger.LogInfo("Trainer ready");
                 }
                 else
                 {
