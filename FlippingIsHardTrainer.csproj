@@ -10,6 +10,7 @@
     <Nullable>disable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Platforms>AnyCPU</Platforms>
+    <InteropDirectory Condition="'$(InteropDirectory)' == ''">lib</InteropDirectory>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,55 +20,59 @@
 
   <ItemGroup>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>lib\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>$(InteropDirectory)/UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.PhysicsModule">
-      <HintPath>lib\UnityEngine.PhysicsModule.dll</HintPath>
+      <HintPath>$(InteropDirectory)/UnityEngine.PhysicsModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.IMGUIModule">
-      <HintPath>lib\UnityEngine.IMGUIModule.dll</HintPath>
+      <HintPath>$(InteropDirectory)/UnityEngine.IMGUIModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.TextRenderingModule">
-      <HintPath>lib\UnityEngine.TextRenderingModule.dll</HintPath>
+      <HintPath>$(InteropDirectory)/UnityEngine.TextRenderingModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.InputLegacyModule">
-      <HintPath>lib\UnityEngine.InputLegacyModule.dll</HintPath>
+      <HintPath>$(InteropDirectory)/UnityEngine.InputLegacyModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Unity.InputSystem">
-      <HintPath>lib\Unity.InputSystem.dll</HintPath>
+      <HintPath>$(InteropDirectory)/Unity.InputSystem.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Il2Cppmscorlib">
-      <HintPath>lib\Il2Cppmscorlib.dll</HintPath>
+      <HintPath>$(InteropDirectory)/Il2Cppmscorlib.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Il2CppSystem">
-      <HintPath>lib\Il2CppSystem.dll</HintPath>
+      <HintPath>$(InteropDirectory)/Il2CppSystem.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Il2CppSystem.Core">
-      <HintPath>lib\Il2CppSystem.Core.dll</HintPath>
+      <HintPath>$(InteropDirectory)/Il2CppSystem.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="com.rlabrecque.steamworks.net">
+      <HintPath>$(InteropDirectory)/com.rlabrecque.steamworks.net.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Assembly-CSharp">
-      <HintPath>lib\Assembly-CSharp.dll</HintPath>
+      <HintPath>$(InteropDirectory)/Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Unity.Cinemachine">
-      <HintPath>lib\Unity.Cinemachine.dll</HintPath>
+      <HintPath>$(InteropDirectory)/Unity.Cinemachine.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Unity.Splines">
-      <HintPath>lib\Unity.Splines.dll</HintPath>
+      <HintPath>$(InteropDirectory)/Unity.Splines.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Unity.Mathematics">
-      <HintPath>lib\Unity.Mathematics.dll</HintPath>
+      <HintPath>$(InteropDirectory)/Unity.Mathematics.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
