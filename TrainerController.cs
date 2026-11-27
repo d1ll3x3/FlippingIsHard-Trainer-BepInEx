@@ -16,6 +16,12 @@ namespace FlippingIsHardTrainer
         private bool _keepVelocityActive = false;
         private bool _keepAngleActive = false;
         private bool _autoRepairActive = false;
+        // The game's fly cheat was on when the trainer disabled it, so it is given back.
+        private bool _nativeFlyDisabled = false;
+
+        // The ToggleMod bind's state. Static for the help beam patch; not saved, so every
+        // game session starts with the trainer on.
+        public static bool ModEnabled { get; private set; } = true;
 
         // Fly mode (trainer-owned, position-based so it works on the game's kinematic body)
         private bool _flyWasKinematic = false;
@@ -98,11 +104,6 @@ namespace FlippingIsHardTrainer
                     _overlayRenderer.RefreshKeybinds(_lastDevice);
                 }
 
-                // Disable the game's OWN fly cheat so its Shift+F toggle can never start a
-                // second, separate fly (our turbo is Shift, our fly is F, so Shift+F would
-                // otherwise trigger the game's native fly).
-                DisableNativeFly();
-
                 // Window focus gate: while the window is unfocused (e.g. Steam overlay opened
                 // with Shift+Tab) we don't process any trainer hotkeys, and we apply a short
                 // grace + edge reset on regaining focus so a modifier still held from the tab
@@ -115,6 +116,16 @@ namespace FlippingIsHardTrainer
                 }
                 _wasFocused = focused;
                 bool acceptInput = focused && Time.unscaledTime >= _inputGraceUntil;
+
+                // Turn the whole trainer off / on (F1). While off, nothing below runs.
+                if (acceptInput && !_bindMenuRenderer.IsListening && _inputHandler.IsToggleModPressed())
+                    ToggleMod();
+                if (!ModEnabled) return;
+
+                // Disable the game's OWN fly cheat so its Shift+F toggle can never start a
+                // second, separate fly (our turbo is Shift, our fly is F, so Shift+F would
+                // otherwise trigger the game's native fly).
+                DisableNativeFly();
 
                 // Open / close bind menu (not while the menu is capturing a bind, or assigning
                 // the menu's own key would close it)
@@ -208,7 +219,7 @@ namespace FlippingIsHardTrainer
         {
             try
             {
-                if (!enabled) return;
+                if (!enabled || !ModEnabled) return;
                 _overlayRenderer.OnGUI();
                 _bindMenuRenderer?.Draw();
             }
@@ -218,6 +229,25 @@ namespace FlippingIsHardTrainer
             }
         }
         
+        private void ToggleMod()
+        {
+            ModEnabled = !ModEnabled;
+            if (!ModEnabled)
+            {
+                // Closes the menu without saving and unfreezes the player before the rest.
+                if (_bindMenuRenderer.IsVisible)
+                {
+                    _bindMenuRenderer.ToggleVisibility();
+                    HandleMenuFreeze();
+                }
+                if (_flyModeActive)
+                    ToggleFlyMode();
+                _ghostMode.Disable();
+                RestoreNativeFly();
+            }
+            TrainerPlugin.Logger.LogInfo($"Trainer {(ModEnabled ? "enabled" : "disabled")}");
+        }
+
         private void HandleMenuFreeze()
         {
             try
@@ -527,6 +557,7 @@ namespace FlippingIsHardTrainer
                 if (flyCheat != null && flyCheat.enabled)
                 {
                     flyCheat.enabled = false;
+                    _nativeFlyDisabled = true;
                     TrainerPlugin.Logger.LogInfo("[FLY] Disabled native EHS.FlyCheat (only trainer fly remains).");
                 }
             }
@@ -534,6 +565,16 @@ namespace FlippingIsHardTrainer
             {
                 TrainerPlugin.Logger.LogWarning($"[FLY] Error disabling native fly: {ex.Message}");
             }
+        }
+
+        private void RestoreNativeFly()
+        {
+            if (!_nativeFlyDisabled) return;
+
+            var flyCheat = _gameObjectFinder.GetFlyCheat();
+            if (flyCheat != null)
+                flyCheat.enabled = true;
+            _nativeFlyDisabled = false;
         }
 
         private void ToggleFlyMode()

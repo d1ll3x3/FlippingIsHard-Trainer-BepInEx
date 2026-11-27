@@ -36,6 +36,7 @@ namespace FlippingIsHardTrainer
             new BindAction("Auto-repair",      false, s => s.ToggleAutoRepair),
             new BindAction("Help beam (solo)", false, s => s.ToggleHelpBeam),
             new BindAction("Open this menu",   false, s => s.OpenBindMenu),
+            new BindAction("Enable / disable mod", false, s => s.ToggleMod),
             new BindAction("Ghost mode",       false, s => s.ToggleGhostMode),
             new BindAction("Set start here",   false, s => s.GhostSetStart),
             new BindAction("Set end here",     false, s => s.GhostSetEnd),
@@ -51,8 +52,8 @@ namespace FlippingIsHardTrainer
             new BindAction("Down",             true,  s => s.FlyDown),
             new BindAction("Turbo (hold)",     true,  s => s.FlyTurbo),
         };
-        private const int GHOST_SECTION_START = 7;
-        private const int FLY_SECTION_START = 13;
+        private const int GHOST_SECTION_START = 8;
+        private const int FLY_SECTION_START = 14;
 
         // Gamepad navigation items: one per bind row, then HUD Scale, Reset, Cancel, Save.
         private static readonly int NAV_SCALE  = Actions.Length;
@@ -724,6 +725,7 @@ namespace FlippingIsHardTrainer
                 ToggleAutoRepair   = src.ToggleAutoRepair.Clone(),
                 ToggleHelpBeam     = src.ToggleHelpBeam.Clone(),
                 OpenBindMenu       = src.OpenBindMenu.Clone(),
+                ToggleMod          = src.ToggleMod.Clone(),
                 ToggleGhostMode    = src.ToggleGhostMode.Clone(),
                 GhostSetStart      = src.GhostSetStart.Clone(),
                 GhostSetEnd        = src.GhostSetEnd.Clone(),

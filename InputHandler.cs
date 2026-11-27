@@ -101,7 +101,7 @@ namespace FlippingIsHardTrainer
                            s.ToggleKeepVelocity, s.ToggleKeepAngle, s.ToggleAutoRepair,
                            s.ToggleHelpBeam, s.OpenBindMenu,
                            s.ToggleGhostMode, s.GhostSetStart, s.GhostSetEnd,
-                           s.GhostRecord, s.GhostPlay, s.GhostSpectate };
+                           s.GhostRecord, s.GhostPlay, s.GhostSpectate, s.ToggleMod };
         }
 
         // True if another bind shares this bind's main key but requires a modifier that is
@@ -176,6 +176,7 @@ namespace FlippingIsHardTrainer
             return justPressed;
         }
 
+        public bool IsToggleModPressed() => CheckBindPressed("Mod", TrainerConfig.Settings.ToggleMod);
         public bool IsSavePositionPressed() => CheckBindPressed("Save", TrainerConfig.Settings.SavePosition);
         public bool IsTeleportPressed() => CheckBindPressed("Teleport", TrainerConfig.Settings.Teleport);
         public bool IsToggleFlyModePressed() => CheckBindPressed("Fly", TrainerConfig.Settings.ToggleFlyMode);

@@ -54,6 +54,7 @@ menu **auto-switch** to show the controls of whichever device you are currently 
 | Action                       | Keyboard    | Xbox      | PlayStation |
 |------------------------------|-------------|-----------|-------------|
 | Open Keybinds Menu           | `B`         | LB + RB   | L1 + R1     |
+| Disable / enable the whole mod | `F1`      | Not set   | Not set     |
 | Save position                | `Shift + R` | LB + X    | L1 + Square |
 | Teleport to saved position (ghost mode: restart at the ghost start) | `R` | X | Square |
 | Toggle Fly Mode              | `F`         | L3        | L3          |
@@ -67,6 +68,11 @@ menu **auto-switch** to show the controls of whichever device you are currently 
 | Record / stop a ghost        | `U`         | LB + D-Up | L1 + D-Up   |
 | Play / stop a ghost          | `I`         | LB + D-Right | L1 + D-Right |
 | Spectate / stop a ghost      | `O`         | LB + D-Down | L1 + D-Down |
+
+While the mod is disabled the HUD is hidden and only its toggle bind works: the menu closes
+(without saving), fly mode, ghost mode and any ghost being played stop, the solo help beam
+can't be summoned and the game's own fly cheat is restored. Achievements stay blocked, since
+the mod can be turned back on at any moment. The mod starts enabled.
 
 All binds, including the fly controls below, are remappable in the **Keybinds Menu**, with
 **2-button gamepad combos** (hold any button and press another). Click the Keyboard or Gamepad

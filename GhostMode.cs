@@ -92,6 +92,18 @@ namespace FlippingIsHardTrainer
             DrawMarkers();
         }
 
+        /// <summary>
+        /// The trainer is being turned off: ghost mode, any ghost on screen and the markers go
+        /// with it, since Update stops running.
+        /// </summary>
+        public void Disable()
+        {
+            if (Active) ToggleActive();
+            StopPlayback();
+            _startMarker.Hide();
+            _endMarker.Hide();
+        }
+
         /// <summary>Call every FixedUpdate.</summary>
         public void FixedUpdate()
         {

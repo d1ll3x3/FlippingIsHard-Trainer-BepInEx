@@ -23,7 +23,7 @@ namespace FlippingIsHardTrainer
         // __0 = allowSolo (positional, so it doesn't depend on interop parameter names).
         private static void Prefix(ref bool __0)
         {
-            if (TrainerConfig.Settings.HelpBeamSingleplayer)
+            if (TrainerController.ModEnabled && TrainerConfig.Settings.HelpBeamSingleplayer)
                 __0 = true;
         }
     }

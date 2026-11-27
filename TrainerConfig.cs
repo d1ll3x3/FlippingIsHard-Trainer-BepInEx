@@ -133,6 +133,10 @@ namespace FlippingIsHardTrainer
         public KeyBind OpenBindMenu { get; set; } = new KeyBind(KeyCode.B)
             { GamepadModifier = GamepadButton.LeftShoulder, GamepadBtn = GamepadButton.RightShoulder };
 
+        // Turns the whole trainer off and back on. No gamepad default: assign one in the menu.
+        // Missing in old configs -> initializer applies, so no version bump.
+        public KeyBind ToggleMod { get; set; } = new KeyBind(KeyCode.F1);
+
         // Ghost mode. Keys clear of FIH Ghost's J K L, so both mods can run together; on a
         // gamepad, LB combos like Save. Missing in old configs -> initializers apply, so no
         // version bump.
