@@ -28,6 +28,7 @@ A highly optimized Unity IL2CPP BepInEx plugin for "Flipping is Hard Demo" that 
   - Ghosts are saved in a `Ghosts` folder next to the trainer's `.dll`. Moving the start or the end keeps the old PB in the list as a recording, and the next finished attempt is the new PB.
 - **🗺️ Level & NPC Teleports** - The menu's **Teleports** tab (`LB`/`RB` on a gamepad switch tabs) takes you to the start of any story level or in front of any NPC; L10 and the Narrator land in front of the boss door. Same targets as [FIH Ghost](https://github.com/d1ll3x3/FIH_Ghost). Story map only.
 - **🏆 No Achievements While Loaded** - Fly, teleports and the rest are advantages, so achievements (and the stats behind them) can't be earned while the trainer is loaded. It uses the game's own achievement block, the one Crowd Control runs use, with no achievement allowed. Remove the trainer to earn them again.
+- **📡 Trainer Use Shown to the Steam Lobby** - When you save a position, teleport, turn fly mode on or restart a ghost attempt while in a Steam lobby, the trainer sets `fih_trainer_used_v1` to `1` in your lobby member data, which other lobby members' games can read. The help beam, auto-repair on its own and ghost playback don't set it.
 - **🎮 Full Gamepad Support** - Xbox & PlayStation controllers, with the overlay/menu auto-switching to the device you're using.
 - **📍 Real-time Telemetry** - HUD in the top-right corner showing current `SPEED`, `HEIGHT`, and `XYZ` position
 - **🎮 Smart Overlay** - Clean, modern HUD showing your binds, active toggles, and saved position state
@@ -111,6 +112,7 @@ Trainer/
 ├── PhoneRepair.cs               # Phone auto-repair via the game's destruction FSM
 ├── HelpBeamUnlock.cs            # Harmony patch that lets the help beam spawn in solo play
 ├── AchievementBlocker.cs        # Keeps the game's achievement block on while the trainer is loaded
+├── TrainerLobbyUsage.cs         # Marks trainer use in your Steam lobby member data
 ├── TrainerTheme.cs              # Shared UI palette, rounded shapes and font
 └── README.md                    # This file
 ```
@@ -119,7 +121,7 @@ Trainer/
 If you want to compile the mod yourself:
 1. Clone the repository.
 2. Ensure you have the **.NET 6.0 SDK** installed.
-3. Provide the reference assemblies in a `lib/` folder (not shipped, as they are game/Unity binaries). Copy them from your game's `BepInEx/interop` folder: `Assembly-CSharp.dll`, `Il2CppSystem.dll`, `Il2Cppmscorlib.dll`, `Unity.InputSystem.dll`, `Unity.Cinemachine.dll`, `Unity.Splines.dll`, `Unity.Mathematics.dll`, and the `UnityEngine.*Module.dll` files referenced in the `.csproj`.
+3. Provide the reference assemblies in a `lib/` folder (not shipped, as they are game/Unity binaries). Copy them from your game's `BepInEx/interop` folder: `Assembly-CSharp.dll`, `Il2CppSystem.dll`, `Il2Cppmscorlib.dll`, `Unity.InputSystem.dll`, `Unity.Cinemachine.dll`, `Unity.Splines.dll`, `Unity.Mathematics.dll`, `Il2CppSystem.Core.dll`, `com.rlabrecque.steamworks.net.dll`, and the `UnityEngine.*Module.dll` files referenced in the `.csproj`. To build straight from another folder instead, pass `-p:InteropDirectory=<path to BepInEx/interop>`.
 4. Run the command `dotnet build -c Release` in the project root.
 5. The `.dll` file will be generated in the `bin/Release/net6.0/` folder.
 
